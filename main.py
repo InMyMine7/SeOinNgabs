@@ -1,5 +1,6 @@
 import requests
 import re
+import time
 from pytrends.request import TrendReq
 from datetime import date
 from bs4 import BeautifulSoup
@@ -23,7 +24,8 @@ banner_menu = '''
 6. h1, h2, h3, h4, h5, h6 checker
 7. Check backlink internal dan external beserta anchor text
 8. Check Broken Links
-9. Analisa link 403 dan 301    
+9. Analisa link 403 dan 301 
+10. Analisis Kecepatan Muat Gambar di Halaman   
 '''
 # Definisi warna untuk output terminal
 COLORS = {
@@ -276,6 +278,36 @@ def analyze_404_301_links():
     except requests.exceptions.RequestException as e:
         print("Terjadi kesalahan permintaan:", e)
 
+
+
+# Fungsi untuk menganalisis kecepatan muat gambar
+def analyze_image_load_speed():
+    clear()
+    print('===== Analyze Image Load Speed =====')
+    
+    try:
+        url = input("\nMasukkan URL halaman: ").strip()
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        for img in soup.find_all('img'):
+            img_url = img.get('src')
+            if img_url:
+                if not img_url.startswith(('http://', 'https://')):
+                    img_url = url.rstrip('/') + '/' + img_url.lstrip('/')
+                
+                start_time = time.time()
+                try:
+                    img_response = requests.get(img_url, stream=True)
+                    load_time = time.time() - start_time
+                    print("\n\033[91mGambar di {} memuat dalam waktu {:.2f} detik\033[0m".format(img_url, load_time))
+                except requests.RequestException:
+                	print("\n\033[92mGagal memuat gambar di {}\033[0m".format(img_url))
+    except requests.RequestException as e:
+    	print("\n\033[92mGagal memeriksa kecepatan gambar untuk {}: {}\033[0m".format(url, e))
+
+    
 # Main function to display menu and execute selected option
 if __name__ == "__main__":
     clear()
@@ -300,5 +332,7 @@ if __name__ == "__main__":
         check_broken_links()
     elif choice == "9":
         analyze_404_301_links()
+    elif choice == "10":
+    	analyze_image_load_speed()
     else:
         print("Invalid choice.")
