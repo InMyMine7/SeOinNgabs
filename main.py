@@ -244,7 +244,7 @@ def check_broken_links():
 # Fungsi untuk menganalisis tautan dengan kode status 404 dan 301
 def analyze_404_301_links():
     clear()
-    print('=====Analisa link 403 dan 301=====')
+    print('=====Analisa link 404 dan 301=====')
     try:
         url = input("\nMasukkan URL halaman: ").strip()
         print("Tunggu sebentar proses ini memakan waktu cukup lama")
