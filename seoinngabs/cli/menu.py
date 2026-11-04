@@ -8,6 +8,7 @@ from ..analyzer.headings import check_headings
 from ..analyzer.images import analyze_image_load_speed
 from ..analyzer.links import analyze_backlinks
 from ..analyzer.meta import check_title_meta_canonical
+from ..analyzer.og import check_og_twitter
 from ..analyzer.redirects import analyze_404_301_links
 from ..core.output import clear_screen, colorize
 from ..generators.htaccess import generate_htaccess
@@ -62,6 +63,7 @@ ACTIONS = {
     "15": generate_terms,
     "16": generate_privacy_policy,
     "17": generate_disclaimer,
+    "18": check_og_twitter,
 }
 
 
@@ -76,7 +78,7 @@ def run_menu(once: bool = False) -> None:
         clear_screen()
         print(render_menu())
         try:
-            choice = input("Choose an option (1-17, 0/q untuk keluar): ").strip().lower()
+            choice = input("Choose an option (1-18, 0/q untuk keluar): ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print()
             return

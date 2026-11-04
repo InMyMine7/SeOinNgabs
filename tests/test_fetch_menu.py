@@ -68,10 +68,10 @@ class TestFetchPage:
 
 class TestMenu:
     def test_menu_actions_complete(self):
-        # fix P5: semua 17 fitur lama tetap ada di menu baru
+        # fix P5: semua 18 fitur (17 lama + 1 baru) tetap ada di menu
         from seoinngabs.cli.menu import ACTIONS
-        assert len(ACTIONS) == 17
-        assert set(ACTIONS.keys()) == {str(i) for i in range(1, 18)}
+        assert len(ACTIONS) == 18
+        assert set(ACTIONS.keys()) == {str(i) for i in range(1, 19)}
 
     def test_menu_loop_exits_on_quit(self, capsys):
         from seoinngabs.cli.menu import run_menu
