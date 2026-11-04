@@ -27,6 +27,7 @@ CLI tool SEO berbasis Python 3. Semua request memakai timeout, User-Agent jelas,
     <li>Title & Meta Length Checker + SERP Preview</li>
     <li>Redirect Chain Tracer</li>
     <li>Site Crawler</li>
+    <li>Sitemap Generator & Validator</li>
 </ul>
 
 ## Installation

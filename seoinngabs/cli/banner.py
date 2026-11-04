@@ -33,6 +33,8 @@ MENU_ITEMS = [
     ("20", "Title & Meta Length Checker + SERP Preview"),
     ("21", "Redirect Chain Tracer"),
     ("22", "Site Crawler"),
+    ("23", "Sitemap Generator"),
+    ("24", "Sitemap Validator"),
 ]
 
 
