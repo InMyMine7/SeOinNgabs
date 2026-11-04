@@ -1,25 +1,13 @@
-"""Schema.org JSON-LD generator (Tahap 4 fitur #7).
-
-Membuat blok <script type="application/ld+json"> untuk tipe umum:
-- WebSite (dengan SearchAction opsional)
-- Organization
-- Article / BlogPosting
-- LocalBusiness (dengan alamat)
-- BreadcrumbList (dari daftar nama -> URL)
-
-Output: JSON valid (json.dumps) dengan indentasi, siap tempel di <head>.
-"""
+"""Schema.org JSON-LD generator."""
 
 import json
 from typing import Dict, List, Optional
 
-from ..core.output import colorize
+from ..core.ui import ask, confirm_overwrite, fail, header, success, warn
 
 
-def build_website_schema(
-    name: str, url: str, search_url: str = "", description: str = ""
-) -> Dict:
-    """Schema WebSite (+ SearchAction bila search_url diberikan: pattern {search_term_string})."""
+def build_website_schema(name: str, url: str, search_url: str = "", description: str = "") -> Dict:
+    """WebSite schema (+ SearchAction when search_url is given)."""
     schema: Dict = {"@context": "https://schema.org", "@type": "WebSite", "name": name, "url": url}
     if description:
         schema["description"] = description
@@ -32,10 +20,8 @@ def build_website_schema(
     return schema
 
 
-def build_organization_schema(
-    name: str, url: str, logo: str = "", same_as: Optional[List[str]] = None
-) -> Dict:
-    """Schema Organization dengan logo dan profil sosial."""
+def build_organization_schema(name: str, url: str, logo: str = "", same_as: Optional[List[str]] = None) -> Dict:
+    """Organization schema with logo and social profiles."""
     schema: Dict = {"@context": "https://schema.org", "@type": "Organization", "name": name, "url": url}
     if logo:
         schema["logo"] = logo
@@ -47,7 +33,7 @@ def build_organization_schema(
 def build_article_schema(
     headline: str, url: str, image: str = "", author: str = "", date_published: str = "", publisher: str = ""
 ) -> Dict:
-    """Schema Article/BlogPosting."""
+    """Article/BlogPosting schema."""
     schema: Dict = {"@context": "https://schema.org", "@type": "Article", "headline": headline, "url": url}
     if image:
         schema["image"] = image
@@ -64,7 +50,7 @@ def build_local_business_schema(
     name: str, url: str, street: str, city: str, region: str, postal_code: str,
     telephone: str = "", image: str = ""
 ) -> Dict:
-    """Schema LocalBusiness dengan PostalAddress."""
+    """LocalBusiness schema with a PostalAddress."""
     schema: Dict = {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
@@ -86,17 +72,17 @@ def build_local_business_schema(
 
 
 def build_breadcrumb_schema(crumbs: List[Dict]) -> Dict:
-    """Schema BreadcrumbList dari list {name, url} (urut dari root)."""
+    """BreadcrumbList schema from {name, url} entries (root first)."""
     items = []
     for i, crumb in enumerate(crumbs, 1):
         if not crumb.get("name") or not crumb.get("url"):
-            raise ValueError(f"Breadcrumb #{i} wajib memiliki 'name' dan 'url'.")
+            raise ValueError(f"Breadcrumb #{i} requires both 'name' and 'url'.")
         items.append({"@type": "ListItem", "position": i, "name": crumb["name"], "item": crumb["url"]})
     return {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items}
 
 
 def render_json_ld(schema: Dict) -> str:
-    """Render dict schema menjadi blok script JSON-LD siap tempel."""
+    """Render a schema dict as a JSON-LD script block."""
     return (
         '<script type="application/ld+json">\n'
         + json.dumps(schema, indent=2, ensure_ascii=False)
@@ -105,73 +91,72 @@ def render_json_ld(schema: Dict) -> str:
 
 
 def generate_schema_interactive() -> None:
-    """Menu interaktif: susun JSON-LD sesuai tipe pilihan user."""
-    print(colorize("===== Schema.org JSON-LD Generator =====", "green"))
-    print("Tipe tersedia: 1=WebSite, 2=Organization, 3=Article, 4=LocalBusiness, 5=BreadcrumbList")
-    choice = input("Pilih tipe (1-5): ").strip()
+    """Interactive: build JSON-LD for the chosen type."""
+    print(header("Schema.org JSON-LD Generator", "Structured data for rich results"))
+    print("  Types: 1=WebSite, 2=Organization, 3=Article, 4=LocalBusiness, 5=BreadcrumbList")
+    choice = ask("Type (1-5)", "1")
 
     try:
         if choice == "1":
             schema = build_website_schema(
-                name=input("Nama situs: ").strip(),
-                url=input("URL situs: ").strip(),
-                search_url=input("URL pencarian, mis. https://x.com/?s={search_term_string} (opsional): ").strip(),
-                description=input("Deskripsi (opsional): ").strip(),
+                name=ask("Site name"),
+                url=ask("Site URL"),
+                search_url=ask("Search URL, e.g. https://x.com/?s={search_term_string} (optional)"),
+                description=ask("Description (optional)"),
             )
         elif choice == "2":
-            socials = input("URL profil sosial, pisahkan koma (opsional): ").strip()
+            socials = ask("Social profile URLs, comma separated (optional)")
             schema = build_organization_schema(
-                name=input("Nama organisasi: ").strip(),
-                url=input("URL situs: ").strip(),
-                logo=input("URL logo (opsional): ").strip(),
+                name=ask("Organization name"),
+                url=ask("Site URL"),
+                logo=ask("Logo URL (optional)"),
                 same_as=[s.strip() for s in socials.split(",") if s.strip()] or None,
             )
         elif choice == "3":
             schema = build_article_schema(
-                headline=input("Judul artikel: ").strip(),
-                url=input("URL artikel: ").strip(),
-                image=input("URL gambar utama (opsional): ").strip(),
-                author=input("Nama penulis (opsional): ").strip(),
-                date_published=input("Tanggal publikasi YYYY-MM-DD (opsional): ").strip(),
-                publisher=input("Nama penerbit (opsional): ").strip(),
+                headline=ask("Article headline"),
+                url=ask("Article URL"),
+                image=ask("Main image URL (optional)"),
+                author=ask("Author name (optional)"),
+                date_published=ask("Publish date YYYY-MM-DD (optional)"),
+                publisher=ask("Publisher name (optional)"),
             )
         elif choice == "4":
             schema = build_local_business_schema(
-                name=input("Nama bisnis: ").strip(),
-                url=input("URL situs: ").strip(),
-                street=input("Alamat jalan: ").strip(),
-                city=input("Kota: ").strip(),
-                region=input("Provinsi/wilayah: ").strip(),
-                postal_code=input("Kode pos: ").strip(),
-                telephone=input("Telepon (opsional): ").strip(),
-                image=input("URL gambar (opsional): ").strip(),
+                name=ask("Business name"),
+                url=ask("Site URL"),
+                street=ask("Street address"),
+                city=ask("City"),
+                region=ask("Region/state"),
+                postal_code=ask("Postal code"),
+                telephone=ask("Telephone (optional)"),
+                image=ask("Image URL (optional)"),
             )
         elif choice == "5":
             crumbs = []
-            print("Masukkan breadcrumb dari root (kosongkan nama untuk selesai):")
+            print("  Enter breadcrumbs from the root (empty name to finish):")
             while True:
-                cname = input("  Nama: ").strip()
+                cname = ask("  Name")
                 if not cname:
                     break
-                curl = input("  URL: ").strip()
+                curl = ask("  URL")
                 crumbs.append({"name": cname, "url": curl})
             schema = build_breadcrumb_schema(crumbs)
         else:
-            print(colorize("Pilihan tidak valid.", "red"))
+            print(fail("Invalid choice."))
             return
     except ValueError as e:
-        print(colorize(f"Input tidak valid: {e}", "red"))
+        print(fail(f"Invalid input: {e}"))
         return
 
     output = render_json_ld(schema)
-    print(f"\n{colorize('JSON-LD:', 'green')}\n{output}")
+    print(f"\n{output}")
 
     from pathlib import Path
 
-    save = input("\nSimpan ke schema.html? (y/n): ").strip().lower() == "y"
-    if save:
+    if ask("Save to schema.html? (y/n)", "n").lower() == "y":
         path = Path.cwd() / "schema.html"
-        if path.exists() and input("schema.html sudah ada. Timpa? (y/n): ").strip().lower() != "y":
+        if not confirm_overwrite(str(path)):
             return
         path.write_text(output + "\n", encoding="utf-8")
-        print(colorize("Tersimpan sebagai schema.html", "green"))
+        print(success(f"Saved as {path}"))

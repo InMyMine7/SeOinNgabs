@@ -119,7 +119,7 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         parser.print_help()
         return 0
 
-    from ..core.output import colorize
+    from ..core.ui import fail as ui_fail
 
     try:
         if args.command == "trends":
@@ -286,7 +286,7 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
             from ..analyzer.backlinks_gen import check_backlink_url, load_backlink_sites
 
             if not _valid_domain(args.domain):
-                print(colorize(f"Domain tidak valid: {args.domain}", "red"))
+                print(ui_fail(f"Invalid domain: {args.domain}"))
                 return 1
             for template in load_backlink_sites()[:50]:  # CLI: batasi 50 agar praktis
                 url = template.replace("inmymine7", args.domain)
@@ -315,7 +315,7 @@ def run_cli(argv: Optional[List[str]] = None) -> int:
         print("\nDibatalkan.")
         return 130
     except Exception as e:
-        print(colorize(f"Error: {e}", "red"), file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)
         return 1
 
     return 0

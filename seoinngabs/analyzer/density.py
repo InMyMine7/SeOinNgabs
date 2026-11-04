@@ -1,20 +1,10 @@
-"""Keyword density checker (fix K1-K5).
-
-Perbaikan vs main.py lama:
-- script/style/noscript/template di-strip EKSPLISIT sebelum get_text (fix K1
-  — tidak lagi bergantung perilaku parser).
-- Dukung frasa (bigram/trigram via n-gram) + kata tunggal (fix K2).
-- Token 1-huruf dan angka murni difilter (fix K3).
-- Session terpusat: timeout/UA (fix K4).
-"""
+"""Keyword density checker."""
 
 import re
-from collections import Counter
 from typing import List
 
 from bs4 import BeautifulSoup
 
-from ..core.output import colorize
 from .fetch import fetch_page, parse_soup
 
 STRIP_TAGS = ("script", "style", "noscript", "template")
@@ -23,7 +13,7 @@ MIN_TOKEN_LEN = 2
 
 
 def extract_text(soup) -> str:
-    """Teks halaman tanpa script/style/noscript/template (fix K1)."""
+    """Page text without script/style/noscript/template."""
     for tag_name in STRIP_TAGS:
         for tag in soup.find_all(tag_name):
             tag.decompose()
@@ -31,7 +21,7 @@ def extract_text(soup) -> str:
 
 
 def tokenize(text: str) -> List[str]:
-    """Tokenisasi case-folded, filter token pendek/angka (fix K3)."""
+    """Case-folded tokens, short/pure-number tokens filtered."""
     return [
         w for w in WORD_RE.findall(text.lower())
         if len(w) >= MIN_TOKEN_LEN and not w.isdigit()
@@ -39,7 +29,7 @@ def tokenize(text: str) -> List[str]:
 
 
 def count_ngrams(tokens: List[str], keyword: str, n: int) -> int:
-    """Hitung kemunculan n-gram keyword dalam token list (fix K2)."""
+    """Count occurrences of an n-gram keyword in the token list."""
     if n < 1:
         return 0
     target = keyword.lower().split()
@@ -53,36 +43,42 @@ def count_ngrams(tokens: List[str], keyword: str, n: int) -> int:
 
 
 def check_keyword_density() -> None:
-    """Menu interaktif: hitung kepadatan kata kunci (mendukung frasa)."""
-    print("=====Keyword Density Checker=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: compute keyword density (single word or phrase)."""
+    from ..core.ui import ask, ask_url, fail, header, label_value, success, warn
+
+    print(header("Keyword Density Checker", "Word or phrase density (1-3 gram)"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
-    keyword = input("Masukkan kata kunci yang ingin diperiksa (kata atau frasa): ").strip().lower()
+    keyword = ask("Keyword or phrase (e.g. \"seo tools\")").strip().lower()
     if not keyword:
-        print(colorize("Kata kunci tidak dimasukkan.", "red"))
+        print(fail("Keyword cannot be empty."))
         return
 
     tokens = tokenize(extract_text(soup))
     total_words = len(tokens)
-
     if total_words == 0:
-        print(colorize("Halaman tidak mengandung teks.", "red"))
+        print(warn("This page contains no text."))
         return
 
     n = len(keyword.split())
-    frequency = count_ngrams(tokens, keyword, n)
+    if n > 3:
+        print(warn("Only 1-3 word phrases are supported; extra words ignored."))
+        n = 3
+    frequency = count_ngrams(tokens, " ".join(keyword.split()[:3]), n)
     density = frequency / total_words * 100
-    unit = "frasa" if n > 1 else "kata"
-    print(
-        colorize(
-            f"Kepadatan kata kunci '{keyword}': {density:.2f}% ({frequency} kali dari {total_words} kata) "
-            f"[dihitung sebagai {unit} {n}-gram]",
-            "green",
-        )
-    )
+    print()
+    print(label_value("Keyword", f"'{keyword}'"))
+    print(label_value("Occurrences", f"{frequency} of {total_words} words"))
+    print(label_value("Density", f"{density:.2f}%"))
+    if density > 5:
+        print(warn("Density above 5% may look like keyword stuffing."))
+    elif density < 0.5 and frequency == 0:
+        print(warn("Keyword not found on this page."))
+    else:
+        print(success("Density within a reasonable range."))

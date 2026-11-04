@@ -1,12 +1,4 @@
-"""Export hasil analisis ke CSV / JSON / HTML (Tahap 4 fitur #8).
-
-Tiga format dengan struktur data tabel generik (list of dict):
-- CSV  : kolom dari union semua key, aman untuk karakter koma/kutip
-- JSON : list of dict, indentasi 2, unicode utuh
-- HTML : tabel sederhana dengan header, siap dibuka browser
-
-Mode batch: pemrosesan banyak URL sekaligus (paralel, rate-limited).
-"""
+"""Export analysis results to CSV / JSON / HTML + batch mode."""
 
 import csv
 import html
@@ -16,11 +8,11 @@ from pathlib import Path
 from typing import Callable, Dict, List
 
 from ..analyzer.fetch import fetch_page, parse_soup
-from ..core.output import colorize
+from ..core.ui import ask, fail, header, paint, success, warn
 
 
 def rows_to_csv(rows: List[Dict]) -> str:
-    """Render list of dict menjadi CSV (union kolom, deterministik)."""
+    """Render a list of dicts as CSV (union of columns)."""
     if not rows:
         return ""
     fieldnames: List[str] = []
@@ -37,12 +29,12 @@ def rows_to_csv(rows: List[Dict]) -> str:
 
 
 def rows_to_json(rows: List[Dict]) -> str:
-    """Render list of dict menjadi JSON indentasi."""
+    """Render a list of dicts as indented JSON."""
     return json.dumps(rows, indent=2, ensure_ascii=False, default=str)
 
 
-def rows_to_html(rows: List[Dict], title: str = "Laporan") -> str:
-    """Render list of dict menjadi tabel HTML."""
+def rows_to_html(rows: List[Dict], title: str = "Report") -> str:
+    """Render a list of dicts as an HTML table."""
     fieldnames: List[str] = []
     for row in rows:
         for key in row:
@@ -51,7 +43,7 @@ def rows_to_html(rows: List[Dict], title: str = "Laporan") -> str:
     esc = html.escape
     parts = [f"<html><head><meta charset='utf-8'><title>{esc(title)}</title></head><body>"]
     parts.append(f"<h1>{esc(title)}</h1>")
-    parts.append(f"<p>{len(rows)} baris</p>")
+    parts.append(f"<p>{len(rows)} rows</p>")
     parts.append("<table border='1' cellpadding='4' cellspacing='0'>")
     parts.append("<tr>" + "".join(f"<th>{esc(str(f))}</th>" for f in fieldnames) + "</tr>")
     for row in rows:
@@ -62,22 +54,14 @@ def rows_to_html(rows: List[Dict], title: str = "Laporan") -> str:
 
 
 def export_rows(rows: List[Dict], output_path: str, fmt: str = "csv") -> Path:
-    """Simpan rows ke file sesuai format.
-
-    Args:
-        rows: data tabel.
-        output_path: path file tujuan (ekstensi ditambahkan bila belum cocok).
-        fmt: 'csv' | 'json' | 'html'.
-
-    Returns:
-        Path file yang ditulis.
+    """Save rows to a file in the chosen format.
 
     Raises:
-        ValueError: format tidak dikenal.
+        ValueError: unknown format.
     """
     fmt = fmt.lower().lstrip(".")
     if fmt not in ("csv", "json", "html"):
-        raise ValueError(f"Format tidak didukung: {fmt!r} (pilih csv/json/html)")
+        raise ValueError(f"Unsupported format: {fmt!r} (choose csv/json/html)")
 
     path = Path(output_path)
     if path.suffix.lower().lstrip(".") != fmt:
@@ -96,7 +80,7 @@ def export_rows(rows: List[Dict], output_path: str, fmt: str = "csv") -> Path:
 
 
 def _to_cell(value) -> str:
-    """Konversi nilai sel menjadi string yang aman untuk CSV/HTML."""
+    """Convert a cell value into a CSV/HTML-safe string."""
     if value is None:
         return ""
     if isinstance(value, (list, tuple)):
@@ -112,17 +96,7 @@ def batch_analyze(
     workers: int = 4,
     progress: bool = True,
 ) -> List[Dict]:
-    """Jalankan analyzer(response, soup) -> dict untuk banyak URL paralel.
-
-    Args:
-        urls: daftar URL.
-        analyzer: callable(response, soup) -> dict hasil.
-        workers: jumlah thread (bounded, tetap rate-limited oleh session).
-        progress: tampilkan progres sederhana.
-
-    Returns:
-        List of dict hasil + kolom url/status/error per entri.
-    """
+    """Run analyzer(response, soup) -> dict for many URLs in parallel."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     def worker(url: str) -> Dict:
@@ -143,14 +117,14 @@ def batch_analyze(
         for i, future in enumerate(as_completed(futures), 1):
             results.append(future.result())
             if progress and i % 10 == 0:
-                print(f"  ... {i}/{len(futures)} URL", end="\r")
+                print(f"  ... {i}/{len(futures)} URLs", end="\r")
     if progress:
         print(" " * 30, end="\r")
     return results
 
 
 def _title_meta_analyzer(response, soup):
-    """Analyzer batch: title/meta/canonical."""
+    """Batch analyzer: title/meta/canonical."""
     from ..analyzer.meta import extract_page_meta
 
     meta = extract_page_meta(response.url)
@@ -162,7 +136,7 @@ def _title_meta_analyzer(response, soup):
 
 
 def _headings_analyzer(response, soup):
-    """Analyzer batch: ringkasan heading."""
+    """Batch analyzer: heading summary."""
     from ..analyzer.headings import analyze_headings
 
     result = analyze_headings(soup)
@@ -177,13 +151,13 @@ BATCH_ANALYZERS = {"1": _title_meta_analyzer, "2": _headings_analyzer}
 
 
 def export_interactive() -> None:
-    """Menu interaktif: analisis batch banyak URL -> export CSV/JSON/HTML."""
-    print("===== Export CSV/JSON/HTML + Batch Mode =====")
-    print("Masukkan URL satu per satu (kosong + Enter untuk selesai):")
+    """Interactive: batch-analyze many URLs, then export as CSV/JSON/HTML."""
+    print(header("Export CSV/JSON/HTML", "Batch analysis and reporting"))
+    print(paint("  Enter URLs one per line (empty line to finish):", ""))
     urls: List[str] = []
     while True:
         try:
-            url = input("URL (atau kosong): ").strip()
+            url = input("    URL: ").strip()
         except EOFError:
             break
         if not url:
@@ -191,27 +165,29 @@ def export_interactive() -> None:
         urls.append(url)
 
     if not urls:
-        print(colorize("Tidak ada URL yang dimasukkan.", "red"))
+        print(fail("No URLs entered."))
         return
 
-    print("\nPilih analisis: 1=Title/Meta/Canonical, 2=Headings ringkas")
-    choice = input("Pilihan (default 1): ").strip() or "1"
+    print("\n  Choose an analysis:")
+    print("    1  Title / Meta / Canonical")
+    print("    2  Headings summary")
+    choice = ask("Analysis", "1")
     analyzer = BATCH_ANALYZERS.get(choice)
     if analyzer is None:
-        print(colorize("Pilihan analisis tidak valid.", "red"))
+        print(fail("Invalid analysis choice."))
         return
 
-    print(f"\nMenganalisis {len(urls)} URL (paralel, rate-limited)...")
+    print(f"\n  Analyzing {len(urls)} URLs (parallel, rate-limited)...")
     rows = batch_analyze(urls, analyzer)
 
     fmt = ""
     while fmt not in ("csv", "json", "html"):
-        fmt = input("Format export (csv/json/html): ").strip().lower()
-    output = input("Nama file output (default: laporan): ").strip() or "laporan"
+        fmt = ask("Export format (csv/json/html)", "csv").lower()
+    output = ask("Output file name", "report")
 
     try:
         path = export_rows(rows, output, fmt)
     except ValueError as e:
-        print(colorize(str(e), "red"))
+        print(fail(str(e)))
         return
-    print(colorize(f"\n{len(rows)} baris diekspor ke {path}", "green"))
+    print(success(f"{len(rows)} rows exported to {path}"))

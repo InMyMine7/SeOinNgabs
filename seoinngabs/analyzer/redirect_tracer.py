@@ -66,34 +66,38 @@ def trace_redirects(url: str, max_hops: int = MAX_HOPS) -> Dict:
 
 
 def trace_redirects_interactive() -> None:
-    """Menu interaktif: telusuri dan tampilkan rantai redirect."""
-    print("=====Redirect Chain Tracer=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: trace and display the redirect chain."""
+    from ..core.ui import GREEN, RED, ask_url, fail, header, label_value, paint, success, warn
+
+    print(header("Redirect Chain Tracer", "Hop-by-hop redirect trail"))
+    url = ask_url()
     try:
         result = trace_redirects(url)
     except Exception as e:
-        print("Terjadi kesalahan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
-    print(f"\n{colorize('Rantai redirect:', 'green')} {result['total_hops']} hop(s)")
+    print()
+    print(label_value("Total hops", result["total_hops"]))
     for i, hop in enumerate(result["hops"], 1):
         if hop["error"]:
-            print(f"  {i}. {colorize('ERROR', 'red')} {hop['url']} — {hop['error']}")
+            print(f"  {i}. {paint('ERROR', RED)} {hop['url']} — {hop['error']}")
             continue
         status = hop["status"]
-        color = "red" if status in REDIRECT_CODES else "green"
-        line = f"  {i}. [{colorize(str(status), color)}] {hop['url']}"
+        mark = paint(f"{status}", RED if status in REDIRECT_CODES else GREEN)
+        line = f"  {i}. [{mark}] {hop['url']}"
         if hop["location"]:
-            line += f"\n      -> {hop['location']}"
+            line += f"\n       -> {hop['location']}"
         print(line)
 
+    print()
     if result["loop"]:
-        print(colorize(f"\n[!] LOOP TERDETEKSI — redirect kembali ke URL yang sudah dikunjungi.", "red"))
+        print(warn("LOOP DETECTED — redirects back to an already visited URL."))
     elif not result["completed"]:
-        print(colorize(f"\n[!] Rantai terpotong: melebihi {MAX_HOPS} hop.", "red"))
+        print(warn(f"Chain cut off: exceeded {MAX_HOPS} hops."))
     else:
         final_hop = result["hops"][-1]
         if final_hop["status"] in REDIRECT_CODES or final_hop["status"] is None:
-            print(colorize(f"\n[!] Berakhir di status {final_hop['status']} tanpa Location.", "red"))
+            print(warn(f"Ended at status {final_hop['status']} without a Location header."))
         else:
-            print(colorize(f"\nOK — berakhir di {result['final_url']} (status {final_hop['status']}).", "green"))
+            print(success(f"OK — ends at {result['final_url']} (status {final_hop['status']})."))

@@ -16,8 +16,21 @@ from ..core.http import get_session
 
 TRENDING_RSS_URL = "https://trends.google.com/trending/rss"
 
-# geo code -> nama tampilan (untuk pesan output yang dulu hardcoded 'Indonesia')
-GEO_LABELS = {"ID": "Indonesia", "US": "United States", "GB": "United Kingdom", "JP": "Japan", "IN": "India"}
+# geo code -> display name; users may pass any valid Google Trends geo code
+GEO_LABELS = {
+    "ID": "Indonesia", "US": "United States", "GB": "United Kingdom", "JP": "Japan",
+    "IN": "India", "DE": "Germany", "FR": "France", "BR": "Brazil", "KR": "South Korea",
+    "AU": "Australia", "CA": "Canada", "SG": "Singapore", "MY": "Malaysia", "TH": "Thailand",
+    "PH": "Philippines", "VN": "Vietnam", "SA": "Saudi Arabia", "AE": "United Arab Emirates",
+    "NL": "Netherlands", "ES": "Spain", "IT": "Italy", "RU": "Russia", "CN": "China",
+    "TW": "Taiwan", "HK": "Hong Kong", "NZ": "New Zealand", "TR": "Turkey", "EG": "Egypt",
+    "ZA": "South Africa", "NG": "Nigeria", "PK": "Pakistan", "BD": "Bangladesh",
+}
+
+
+def list_available_geos() -> dict:
+    """Return the mapping of supported geo codes to display names."""
+    return dict(GEO_LABELS)
 
 
 def get_trending_searches(geo: str = "ID", limit: Optional[int] = 20) -> List[str]:

@@ -1,39 +1,26 @@
-"""Sitemap XML generator & validator (Tahap 4 fitur #6).
-
-Generator: susun sitemap.xml standar (sitemaps.org) dari daftar URL.
-Validator: cek struktur XML, wajib <loc>, format lastmod (W3C), dan
-URL absolut; laporkan masalah per entri.
-"""
+"""Sitemap XML generator & validator (sitemaps.org)."""
 
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape as xml_escape
 
-from ..core.output import colorize
+from ..core.ui import ask, confirm_overwrite, fail, header, success, warn
 
 NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 W3C_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?([+-]\d{2}:?\d{2}|Z)?)?$")
-MAX_URLS = 50000  # batas standar sitemap tunggal
+MAX_URLS = 50000
 
 
 def build_sitemap(urls: List[Dict], pretty: bool = True) -> str:
-    """Susun XML sitemap dari list entri.
-
-    Args:
-        urls: list of dict {loc (wajib), lastmod?, changefreq?, priority?}.
-        pretty: tambah indentasi.
-
-    Returns:
-        String XML sitemap.
+    """Assemble a sitemap XML string from entries.
 
     Raises:
-        ValueError: bila ada loc kosong atau jumlah URL melebihi batas.
+        ValueError: empty loc or more than MAX_URLS entries.
     """
     if len(urls) > MAX_URLS:
-        raise ValueError(f"Sitemap tunggal maksimum {MAX_URLS} URL (diberikan {len(urls)}).")
+        raise ValueError(f"A single sitemap allows at most {MAX_URLS} URLs (got {len(urls)}).")
 
     lines = ['<?xml version="1.0" encoding="UTF-8"?>']
     lines.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
@@ -41,7 +28,7 @@ def build_sitemap(urls: List[Dict], pretty: bool = True) -> str:
     for entry in urls:
         loc = (entry.get("loc") or "").strip()
         if not loc:
-            raise ValueError("Setiap entri sitemap wajib memiliki 'loc'.")
+            raise ValueError("Every sitemap entry requires 'loc'.")
         lines.append(f"{indent}<url>")
         lines.append(f"{indent}    <loc>{xml_escape(loc)}</loc>")
         if entry.get("lastmod"):
@@ -56,25 +43,20 @@ def build_sitemap(urls: List[Dict], pretty: bool = True) -> str:
 
 
 def validate_sitemap(content: str) -> Dict:
-    """Validasi konten sitemap.xml.
-
-    Returns:
-        dict: valid (bool), errors (list), warnings (list), url_count.
-    """
+    """Validate sitemap XML content; returns valid/errors/warnings/url_count."""
     errors: List[str] = []
     warnings: List[str] = []
 
     try:
         root = ET.fromstring(content)
     except ET.ParseError as e:
-        return {"valid": False, "errors": [f"XML tidak valid: {e}"], "warnings": [], "url_count": 0}
+        return {"valid": False, "errors": [f"Invalid XML: {e}"], "warnings": [], "url_count": 0}
 
     if root.tag != f"{{{NS}}}urlset":
-        # coba tanpa namespace (sitemap non-standar)
         if root.tag == "urlset":
-            warnings.append("Elemen root 'urlset' tanpa namespace sitemaps.org.")
+            warnings.append("Root element 'urlset' is missing the sitemaps.org namespace.")
         else:
-            errors.append(f"Elemen root harus 'urlset' (namespace sitemaps.org), ditemukan: {root.tag}")
+            errors.append(f"Root element must be 'urlset' (sitemaps.org), found: {root.tag}")
             return {"valid": False, "errors": errors, "warnings": warnings, "url_count": 0}
 
     urls = root.findall(f"{{{NS}}}url")
@@ -82,109 +64,108 @@ def validate_sitemap(content: str) -> Dict:
     for i, url in enumerate(urls, 1):
         loc = url.find(f"{{{NS}}}loc")
         if loc is None or not (loc.text or "").strip():
-            errors.append(f"Entri #{i}: elemen <loc> wajib dan tidak boleh kosong.")
+            errors.append(f"Entry #{i}: <loc> is required and must not be empty.")
             continue
         count += 1
         text = loc.text.strip()
         parsed = urlparse(text)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            errors.append(f"Entri #{i}: <loc> harus URL absolut, ditemukan: {text}")
+            errors.append(f"Entry #{i}: <loc> must be an absolute URL, found: {text}")
         lastmod = url.find(f"{{{NS}}}lastmod")
         if lastmod is not None and lastmod.text:
             if not W3C_DATE_RE.match(lastmod.text.strip()):
-                warnings.append(f"Entri #{i}: lastmod '{lastmod.text}' bukan format W3C datetime (YYYY-MM-DD).")
+                warnings.append(f"Entry #{i}: lastmod '{lastmod.text}' is not a W3C datetime (YYYY-MM-DD).")
         priority = url.find(f"{{{NS}}}priority")
         if priority is not None and priority.text:
             try:
                 p = float(priority.text)
                 if not (0.0 <= p <= 1.0):
-                    warnings.append(f"Entri #{i}: priority {p} di luar rentang 0.0-1.0.")
+                    warnings.append(f"Entry #{i}: priority {p} is outside 0.0-1.0.")
             except ValueError:
-                warnings.append(f"Entri #{i}: priority '{priority.text}' bukan angka.")
+                warnings.append(f"Entry #{i}: priority '{priority.text}' is not a number.")
 
     if count > MAX_URLS:
-        errors.append(f"Sitemap tunggal maksimum {MAX_URLS} URL (ditemukan {count}).")
+        errors.append(f"A single sitemap allows at most {MAX_URLS} URLs (found {count}).")
 
     return {"valid": not errors, "errors": errors, "warnings": warnings, "url_count": count}
 
 
 def generate_sitemap_interactive() -> None:
-    """Menu interaktif: buat sitemap.xml dari daftar URL yang dimasukkan."""
-    print(colorize("===== Sitemap Generator =====", "green"))
+    """Interactive: build sitemap.xml from user-entered URLs."""
+    from pathlib import Path
+
+    print(header("Sitemap Generator", "sitemaps.org XML from a list of URLs"))
     urls: List[Dict] = []
-    print("Masukkan URL satu per satu (kosong + Enter untuk selesai):")
+    print("  Enter URLs one per line (empty line to finish):")
     while True:
         try:
-            loc = input("URL (atau kosong): ").strip()
+            loc = input("    URL: ").strip()
         except EOFError:
             break
         if not loc:
             break
         if urlparse(loc).scheme not in ("http", "https"):
-            print(colorize("  URL harus diawali http:// atau https:// — dilewati.", "red"))
+            print(warn("URL must start with http:// or https:// — skipped."))
             continue
         entry: Dict = {"loc": loc}
-        lastmod = input("  lastmod YYYY-MM-DD (opsional, kosongkan): ").strip()
+        lastmod = ask("      lastmod YYYY-MM-DD (optional)")
         if lastmod:
             entry["lastmod"] = lastmod
-        changefreq = input("  changefreq always/hourly/daily/weekly/monthly/yearly/never (opsional): ").strip().lower()
+        changefreq = ask("      changefreq (always/hourly/daily/weekly/monthly/yearly/never)")
         if changefreq:
             entry["changefreq"] = changefreq
-        priority = input("  priority 0.0-1.0 (opsional, kosongkan): ").strip()
+        priority = ask("      priority 0.0-1.0 (optional)")
         if priority:
             try:
                 entry["priority"] = float(priority)
             except ValueError:
-                print(colorize("  priority bukan angka — diabaikan.", "red"))
+                print(warn("Priority is not a number — ignored."))
         urls.append(entry)
 
     if not urls:
-        print(colorize("Tidak ada URL yang dimasukkan.", "red"))
+        print(fail("No URLs entered."))
         return
 
     try:
         content = build_sitemap(urls)
     except ValueError as e:
-        print(colorize(f"Gagal membuat sitemap: {e}", "red"))
+        print(fail(f"Could not build sitemap: {e}"))
         return
 
     report = validate_sitemap(content)
-    print(f"\n{colorize('Sitemap dibuat:', 'green')} {len(urls)} URL, "
-          f"valid={report['valid']}, warning={len(report['warnings'])}")
+    print(success(f"Sitemap built: {len(urls)} URLs, valid={report['valid']}, warnings={len(report['warnings'])}"))
     for w in report["warnings"]:
-        print(colorize(f"  [!] {w}", "red"))
-
-    from pathlib import Path
+        print(warn(w))
 
     output = Path.cwd() / "sitemap.xml"
-    if output.exists() and input("sitemap.xml sudah ada. Timpa? (y/n): ").strip().lower() != "y":
+    if not confirm_overwrite(str(output)):
         return
     output.write_text(content, encoding="utf-8")
-    print(colorize("Tersimpan sebagai sitemap.xml", "green"))
+    print(success(f"Saved as {output}"))
 
 
 def validate_sitemap_interactive() -> None:
-    """Menu interaktif: validasi file sitemap.xml."""
-    print(colorize("===== Sitemap Validator =====", "green"))
+    """Interactive: validate a sitemap.xml file."""
     from pathlib import Path
 
-    path_input = input("Path file sitemap (default: sitemap.xml): ").strip() or "sitemap.xml"
+    print(header("Sitemap Validator", "Structure and field checks"))
+    path_input = ask("Sitemap file path", "sitemap.xml")
     path = Path(path_input)
     if not path.exists():
-        print(colorize(f"File tidak ditemukan: {path}", "red"))
+        print(fail(f"File not found: {path}"))
         return
     try:
         content = path.read_text(encoding="utf-8")
     except OSError as e:
-        print(colorize(f"Gagal membaca file: {e}", "red"))
+        print(fail(f"Could not read file: {e}"))
         return
 
     report = validate_sitemap(content)
     if report["valid"]:
-        print(colorize(f"\nVALID — {report['url_count']} URL ditemukan.", "green"))
+        print(success(f"VALID — {report['url_count']} URLs found."))
     else:
-        print(colorize(f"\nTIDAK VALID — {len(report['errors'])} error:", "red"))
+        print(fail(f"NOT VALID — {len(report['errors'])} error(s):"))
         for e in report["errors"]:
-            print(f"  [X] {e}")
+            print(f"    {e}")
     for w in report["warnings"]:
-        print(colorize(f"  [!] {w}", "red"))
+        print(warn(w))

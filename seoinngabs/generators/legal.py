@@ -1,26 +1,28 @@
-"""Generator dokumen legal: ToS, Privacy Policy, Disclaimer (fix O1-O4).
-
-Perbaikan vs main.py lama:
-- Variabel services/third_party_services privacy dipakai di template (fix O1).
-- Semua template disclaimer menyertakan kontak email (fix O2).
-- Input di-escape (fix O3).
-- Import datetime yang tidak terpakai dibuang (fix O4).
-"""
+"""Legal document generators: ToS, Privacy Policy, Disclaimer."""
 
 import time
 from pathlib import Path
+from typing import List
 
-from ..core.output import colorize, escape_html
+from ..core.ui import ask, confirm_overwrite, fail, header, success
+from ..core.ui import escape_html
 
 
-def _confirm_overwrite(path: Path) -> bool:
-    if not path.exists():
-        return True
-    return input(f"{path.name} sudah ada. Timpa? (y/n): ").strip().lower() == "y"
+def _legal_fields(extra: List[str] = None) -> dict:
+    """Collect common legal document inputs."""
+    fields = {
+        "website_name": ask("Website name"),
+        "website_url": ask("Website URL"),
+        "company_name": ask("Company name"),
+        "contact_email": ask("Contact email"),
+    }
+    for key, prompt in (extra or []):
+        fields[key] = ask(prompt)
+    return fields
 
 
 def build_terms_and_conditions(website_name: str, website_url: str, company_name: str, governing_law: str, contact_email: str) -> str:
-    """Template Terms and Conditions dengan semua input ter-escape."""
+    """Terms and Conditions template with escaped inputs."""
     e = escape_html
     wn, wu, cn, gl, ce = e(website_name), e(website_url), e(company_name), e(governing_law), e(contact_email)
     return f"""<h1>Terms and Conditions for {wn}</h1>
@@ -68,7 +70,7 @@ def build_terms_and_conditions(website_name: str, website_url: str, company_name
 
 
 def build_privacy_policy(website_name: str, website_url: str, company_name: str, company_email: str, services: str = "", third_party_services: str = "") -> str:
-    """Template Privacy Policy — layanan user diinterpolasi (fix O1)."""
+    """Privacy Policy template with user services interpolated."""
     e = escape_html
     wn, wu, cn, ce = e(website_name), e(website_url), e(company_name), e(company_email)
     if services:
@@ -126,7 +128,7 @@ def build_privacy_policy(website_name: str, website_url: str, company_name: str,
 
 
 def build_disclaimer(website_name: str, website_url: str, company_name: str, company_email: str, disclaimer_type: str) -> str:
-    """Template Disclaimer per tipe, semuanya dengan kontak email (fix O2)."""
+    """Disclaimer template per type, all with contact info."""
     e = escape_html
     wn, wu, ce = e(website_name), e(website_url), e(company_email)
     templates = {
@@ -158,52 +160,52 @@ def build_disclaimer(website_name: str, website_url: str, company_name: str, com
 
 
 def generate_terms() -> None:
-    """Menu interaktif: buat terms_and_conditions.html."""
-    print("===== Terms and Conditions Generator =====")
+    """Interactive: create terms_and_conditions.html."""
+    print(header("Terms of Service Generator", "Website terms and conditions"))
     fields = {
-        "website_name": input("Nama Website: ").strip(),
-        "website_url": input("URL Website: ").strip(),
-        "company_name": input("Nama Perusahaan: ").strip(),
-        "governing_law": input("Hukum yang berlaku (misalnya, 'Indonesia'): ").strip(),
-        "contact_email": input("Email Kontak Perusahaan: ").strip(),
+        "website_name": ask("Website name"),
+        "website_url": ask("Website URL"),
+        "company_name": ask("Company name"),
+        "governing_law": ask("Governing law (e.g. Indonesia)"),
+        "contact_email": ask("Contact email"),
     }
     output_path = Path.cwd() / "terms_and_conditions.html"
-    if not _confirm_overwrite(output_path):
+    if not confirm_overwrite(str(output_path)):
         return
     output_path.write_text(build_terms_and_conditions(**fields), encoding="utf-8")
-    print("\nTerms and Conditions telah berhasil dibuat dan disimpan sebagai terms_and_conditions.html.")
+    print(success(f"Terms saved as {output_path}"))
 
 
 def generate_privacy_policy() -> None:
-    """Menu interaktif: buat privacy_policy.html."""
-    print("=====Privacy Policy Generator=====")
+    """Interactive: create privacy_policy.html."""
+    print(header("Privacy Policy Generator", "GDPR-style privacy policy"))
     fields = {
-        "website_name": input("Nama Website: ").strip(),
-        "website_url": input("URL Website: ").strip(),
-        "company_name": input("Nama Perusahaan: ").strip(),
-        "company_email": input("Email Kontak Perusahaan: ").strip(),
-        "services": input("Layanan yang disediakan (pisahkan dengan koma): ").strip(),
-        "third_party_services": input("Layanan pihak ketiga yang digunakan (misalnya Google Analytics, Facebook Pixel): ").strip(),
+        "website_name": ask("Website name"),
+        "website_url": ask("Website URL"),
+        "company_name": ask("Company name"),
+        "company_email": ask("Contact email"),
+        "services": ask("Services provided (comma separated)"),
+        "third_party_services": ask("Third-party services used (e.g. Google Analytics, Facebook Pixel)"),
     }
     output_path = Path.cwd() / "privacy_policy.html"
-    if not _confirm_overwrite(output_path):
+    if not confirm_overwrite(str(output_path)):
         return
     output_path.write_text(build_privacy_policy(**fields), encoding="utf-8")
-    print("\nPrivacy Policy telah berhasil dibuat dan disimpan sebagai privacy_policy.html.")
+    print(success(f"Privacy policy saved as {output_path}"))
 
 
 def generate_disclaimer() -> None:
-    """Menu interaktif: buat disclaimer.html."""
-    print("===== Disclaimer Generator Tool =====")
+    """Interactive: create disclaimer.html."""
+    print(header("Disclaimer Generator", "Medical / financial / website disclaimers"))
     fields = {
-        "website_name": input("Nama Website: ").strip(),
-        "website_url": input("URL Website: ").strip(),
-        "company_name": input("Nama Perusahaan: ").strip(),
-        "company_email": input("Email Kontak Perusahaan: ").strip(),
-        "disclaimer_type": input("Jenis Disclaimer (misalnya: 'medical', 'financial', 'website'): ").strip().lower(),
+        "website_name": ask("Website name"),
+        "website_url": ask("Website URL"),
+        "company_name": ask("Company name"),
+        "company_email": ask("Contact email"),
+        "disclaimer_type": ask("Disclaimer type (medical/financial/website)", "website").lower(),
     }
     output_path = Path.cwd() / "disclaimer.html"
-    if not _confirm_overwrite(output_path):
+    if not confirm_overwrite(str(output_path)):
         return
     output_path.write_text(build_disclaimer(**fields), encoding="utf-8")
-    print("\nDisclaimer telah berhasil dibuat dan disimpan sebagai disclaimer.html.")
+    print(success(f"Disclaimer saved as {output_path}"))

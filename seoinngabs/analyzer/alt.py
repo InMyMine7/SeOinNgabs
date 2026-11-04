@@ -58,38 +58,45 @@ def alt_summary(results: List[Dict]) -> Dict[str, int]:
 
 
 def check_image_alts() -> None:
-    """Menu interaktif: laporkan atribut alt semua gambar."""
-    print("=====Image Alt Checker=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: report the alt attribute of every image."""
+    from ..core.ui import GREEN, RED, ask_url, fail, header, label_value, paint, success, warn
+
+    print(header("Image Alt Checker", "Accessibility & SEO alt attributes"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
     results = analyze_image_alts(soup, response.url)
     if not results:
-        print(colorize("Tidak ada gambar ditemukan di halaman.", "green"))
+        print(warn("No images found on this page."))
         return
 
     for r in results:
         if r["status"] == "ok":
-            print(f"  [{colorize('OK', 'green')}] {r['url']}")
-            print(f"        alt: {r['alt']}")
+            print(f"  {paint('[OK]     ', GREEN)} {r['url']}")
+            print(f"           alt: {r['alt']}")
         elif r["status"] == "missing":
-            print(f"  [{colorize('MISSING', 'red')}] {r['url']}")
-            print(f"        alt: (tidak ada atribut alt)")
+            print(f"  {paint('[MISSING]', RED)} {r['url']}")
+            print(f"           alt: (attribute not present)")
         elif r["status"] == "empty":
-            print(f"  [{colorize('EMPTY', 'red')}] {r['url']}")
-            print(f"        alt: \"\" (kosong — hanya cocok untuk gambar dekoratif)")
+            print(f"  {paint('[EMPTY]  ', RED)} {r['url']}")
+            print(f"           alt: \"\" (decorative only)")
         else:
-            print(f"  [{colorize('LONG', 'red')}] {r['url']}")
-            print(f"        alt ({len(r['alt'])} karakter, maks {MAX_ALT_LENGTH}): {r['alt'][:80]}...")
+            print(f"  {paint('[LONG]   ', RED)} {r['url']}")
+            print(f"           alt ({len(r['alt'])} chars, max {MAX_ALT_LENGTH}): {r['alt'][:80]}...")
 
     summary = alt_summary(results)
-    print(f"\n{colorize('Ringkasan:', 'green')} {summary['total']} gambar — "
-          f"{summary['ok']} OK, {summary['missing']} tanpa alt, "
-          f"{summary['empty']} alt kosong, {summary['long']} terlalu panjang.")
+    print()
+    print(label_value("Images", summary["total"]))
+    print(label_value("With alt", summary["ok"]))
+    print(label_value("Missing alt", summary["missing"]))
+    print(label_value("Empty alt", summary["empty"]))
+    print(label_value("Too long", summary["long"]))
     if summary["missing"] > 0:
-        print(colorize("Rekomendasi: tambahkan atribut alt deskriptif pada semua gambar bermakna.", "red"))
+        print(warn("Recommendation: add descriptive alt text to every meaningful image."))
+    elif summary["missing"] == 0:
+        print(success("All images have alt text."))

@@ -1,4 +1,4 @@
-"""Fetch halaman + parse BeautifulSoup — fondasi semua analyzer (fix D1, D3, E5)."""
+"""Fetch halaman + parse BeautifulSoup — fondasi semua analyzer."""
 
 from typing import Optional, Tuple
 
@@ -15,11 +15,7 @@ def fetch_page(
     allow_redirects: bool = True,
     timeout: Optional[tuple] = None,
 ) -> requests.Response:
-    """Fetch URL dengan normalisasi scheme + session terpusat.
-
-    Bila HEAD ditolak dengan 405/501, fallback ke GET otomatis dipanggil
-    caller (lihat head_or_get).
-    """
+    """Fetch URL with scheme normalization + shared session."""
     normalized = normalize_url(url)
     session = get_session()
     return session.request(
@@ -31,12 +27,7 @@ def fetch_page(
 
 
 def head_or_get(url: str, timeout: Optional[tuple] = None) -> requests.Response:
-    """HEAD dulu; fallback GET bila server menolak HEAD (fix D4, H3).
-
-    Server yang menolak HEAD biasanya membalas 405 atau 501. Untuk
-    membedakan 'ditolak' dari 'rusak', fallback GET hanya dipicu oleh
-    status tersebut — bukan oleh 4xx lain.
-    """
+    """HEAD first; fall back to GET when the server rejects HEAD (405/501)."""
     response = fetch_page(url, method="HEAD", allow_redirects=True, timeout=timeout)
     if response.status_code in (405, 501):
         response.close()
@@ -44,28 +35,31 @@ def head_or_get(url: str, timeout: Optional[tuple] = None) -> requests.Response:
     return response
 
 
-def parse_soup(html_content: bytes | str, parser: str = "html.parser") -> BeautifulSoup:
-    """Parse HTML menjadi BeautifulSoup."""
+def parse_soup(html_content, parser: str = "html.parser") -> BeautifulSoup:
+    """Parse HTML into BeautifulSoup."""
     return BeautifulSoup(html_content, parser)
 
 
 def fetch_soup(url: str) -> Tuple[requests.Response, BeautifulSoup]:
-    """Fetch + parse sekaligus. Raise requests.RequestException bila gagal."""
+    """Fetch + parse; raise requests.RequestException on failure."""
     response = fetch_page(url)
     response.raise_for_status()
     return response, parse_soup(response.content)
 
 
 def check_url_status() -> None:
-    """Menu interaktif: tampilkan status code + info redirect halaman."""
-    print("=====Check Url Status=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: show status code and redirect info for a page."""
+    from ..core.ui import ask_url, fail, header, label_value
+
+    print(header("URL Status Checker", "Response code and redirect chain"))
+    url = ask_url()
     try:
         response = fetch_page(url)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
-    print(f"\nKode respons halaman adalah: {response.status_code}")
+    print()
+    print(label_value("Status code", response.status_code))
     if response.history:
-        print(f"\nURL asli (sebelum diredirect): {response.history[0].url}")
-        print(f"URL redirect: {response.url}")
+        print(label_value("Original URL", response.history[0].url))
+        print(label_value("Final URL", response.url))

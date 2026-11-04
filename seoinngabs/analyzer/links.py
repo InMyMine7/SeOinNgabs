@@ -1,36 +1,26 @@
-"""Analisis backlink internal/eksternal + anchor text (fix G1-G5).
+"""Analisis backlink internal/eksternal + anchor text."""
 
-Perbaikan vs main.py lama:
-- Semua href di-resolve dengan urljoin (fix G2: 'page.html', '//cdn', '?q=1').
-- Klasifikasi www vs apex dianggap sama (fix G1).
-- mailto/tel/javascript/# di-skip eksplisit (fix G3).
-- rel=nofollow dicatat (fix G3, spesifikasi).
-- Duplikat dihilangkan (fix G5).
-"""
-
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
 from ..core.http import get_session
-from ..core.output import colorize
+from ..core.ui import GREEN, YELLOW, ask_url, fail, header, paint
 from ..core.url import join_url, same_site
 from .fetch import fetch_page, parse_soup
 
 SKIP_PREFIXES = ("mailto:", "tel:", "javascript:", "#", "data:", "sms:")
-
 WORKERS = 8
 
 
 def classify_links(url: str, soup: BeautifulSoup, include_subdomains: bool = False) -> dict:
-    """Klasifikasikan semua <a href> menjadi internal/external.
+    """Classify all <a href> into internal/external.
 
     Returns:
         dict: internal, external (list of dict: href, anchor, nofollow),
-        skipped (list href yang di-skip).
+        skipped (list of non-http hrefs).
     """
     internal = []
     external = []
@@ -67,12 +57,7 @@ def classify_links(url: str, soup: BeautifulSoup, include_subdomains: bool = Fal
 
 
 def check_link_status(url: str, method: str = "HEAD", timeout: tuple = (10, 20)) -> dict:
-    """Cek status satu link dengan HEAD->GET fallback dan info redirect.
-
-    Returns:
-        dict: status_code (int|None), error (str|None), redirected (bool),
-        final_url, chain (list of (status, url)).
-    """
+    """Check one link with HEAD->GET fallback and redirect info."""
     session = get_session()
     chain: List[tuple] = []
     try:
@@ -97,7 +82,7 @@ def check_link_status(url: str, method: str = "HEAD", timeout: tuple = (10, 20))
 
 
 def check_urls_parallel(urls: List[str], workers: int = WORKERS, progress: bool = True) -> List[dict]:
-    """Cek banyak URL paralel (bounded) dengan rate-limit session (fix H2, I3)."""
+    """Check many URLs in parallel (bounded) with the rate-limited session."""
     results = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(check_link_status, u): u for u in urls}
@@ -105,29 +90,32 @@ def check_urls_parallel(urls: List[str], workers: int = WORKERS, progress: bool 
             url = futures[future]
             results.append({"url": url, **future.result()})
             if progress and i % 10 == 0:
-                print(f"  ... {i}/{len(futures)} link diperiksa", end="\r")
+                print(f"  ... {i}/{len(futures)} links checked", end="\r")
     if progress:
         print(" " * 40, end="\r")
     return results
 
 
 def analyze_backlinks() -> None:
-    """Menu interaktif: tampilkan internal/external + anchor + nofollow."""
-    print("=====Check backlink internal dan external beserta anchor text=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: list internal/external links with anchor text."""
+    from ..core.ui import GREEN, ask_url, fail, header, paint
+
+    print(header("Internal/External Links", "Links with anchor text and nofollow"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
     result = classify_links(response.url, soup)
-    print(f"\n{colorize('Backlink Internal:', 'green')} ({len(result['internal'])})")
+    print()
+    print(paint(f"  Internal links ({len(result['internal'])}):", GREEN))
     for link in result["internal"]:
-        nofollow = " [nofollow]" if link["nofollow"] else ""
-        print(f"{link['anchor'] or '(tanpa teks)'} -> {link['href']}{nofollow}")
-    print(f"\n{colorize('Backlink Eksternal:', 'green')} ({len(result['external'])})")
+        nofollow = paint(" [nofollow]", YELLOW) if link["nofollow"] else ""
+        print(f"    {link['anchor'] or '(no text)'} -> {link['href']}{nofollow}")
+    print(paint(f"  External links ({len(result['external'])}):", GREEN))
     for link in result["external"]:
-        nofollow = " [nofollow]" if link["nofollow"] else ""
-        print(f"{link['anchor'] or '(tanpa teks)'} -> {link['href']}{nofollow}")
+        nofollow = paint(" [nofollow]", YELLOW) if link["nofollow"] else ""
+        print(f"    {link['anchor'] or '(no text)'} -> {link['href']}{nofollow}")

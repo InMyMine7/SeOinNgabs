@@ -78,4 +78,5 @@ class TestMenu:
         with patch("builtins.input", side_effect=["q"]):
             run_menu()
         out = capsys.readouterr().out
-        assert "17. Disclaimer Generator Tool" in out
+        assert "17  Disclaimer Generator" in out
+        assert "Goodbye!" in out

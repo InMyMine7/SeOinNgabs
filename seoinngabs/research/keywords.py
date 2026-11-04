@@ -14,6 +14,20 @@ from ..core.http import get_session
 
 SUGGEST_URL = "https://suggestqueries.google.com/complete/search"
 
+# language code -> display name; users may pass any valid hl code
+LANGUAGES = {
+    "id": "Indonesian", "en": "English", "ja": "Japanese", "ko": "Korean",
+    "zh": "Chinese", "es": "Spanish", "fr": "French", "de": "German",
+    "it": "Italian", "pt": "Portuguese", "ru": "Russian", "ar": "Arabic",
+    "hi": "Hindi", "th": "Thai", "vi": "Vietnamese", "ms": "Malay",
+    "tr": "Turkish", "nl": "Dutch", "pl": "Polish", "sv": "Swedish",
+}
+
+
+def list_available_languages() -> dict:
+    """Return the mapping of supported language codes to display names."""
+    return dict(LANGUAGES)
+
 
 def research_keyword(keyword: str, hl: str = "id", timeout: tuple = (10, 30)) -> List[str]:
     """Ambil saran keyword dari Google Suggest.

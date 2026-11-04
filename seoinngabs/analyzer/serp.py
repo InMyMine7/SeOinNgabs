@@ -95,37 +95,40 @@ def render_serp_preview(
 
 
 def check_title_meta_lengths() -> None:
-    """Menu interaktif: panjang title/meta description + SERP preview."""
-    print("=====Title & Meta Length Checker + SERP Preview=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: title/meta description length + SERP preview."""
+    from ..core.ui import GREEN, RED, ask_url, fail, header, label_value, paint
+
+    print(header("Title & Meta Length", f"SERP preview — limits {TITLE_LIMIT}/{DESCRIPTION_LIMIT} chars"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
     result = analyze_title_meta_lengths(soup)
+    sign = {"ok": "OK", "too_long": "TOO LONG", "too_short": "TOO SHORT", "empty": "EMPTY"}
 
-    print(f"\n{colorize('Title:', 'red')} batas {TITLE_LIMIT} karakter")
+    print()
+    print(paint("  Title", GREEN), paint(f"(limit {TITLE_LIMIT} chars)", ""))
     if result["title"] is None:
-        print(colorize("  MISSING — tag <title> tidak ditemukan", "red"))
+        print(paint("    MISSING — no <title> tag found", RED))
     else:
         t = result["title"]
-        sign = {"ok": "OK", "too_long": "TERLALU PANJANG", "too_short": "TERLALU PENDEK", "empty": "KOSONG"}
-        print(f"  [{colorize(sign[t['status']], 'red' if t['status'] != 'ok' else 'green')}] "
-              f"{t['length']} karakter: {t['value']}")
+        mark = paint(sign[t["status"]], GREEN if t["status"] == "ok" else RED)
+        print(f"    {mark:<10} {t['length']} chars: {t['value']}")
 
-    print(f"\n{colorize('Meta Description:', 'red')} batas {DESCRIPTION_LIMIT} karakter")
+    print(paint("  Meta description", GREEN), paint(f"(limit {DESCRIPTION_LIMIT} chars)", ""))
     if result["description"] is None:
-        print(colorize("  MISSING — <meta name=description> tidak ditemukan", "red"))
+        print(paint("    MISSING — no <meta name=description> tag found", RED))
     else:
         d = result["description"]
-        sign = {"ok": "OK", "too_long": "TERLALU PANJANG", "too_short": "TERLALU PENDEK", "empty": "KOSONG"}
-        print(f"  [{colorize(sign[d['status']], 'red' if d['status'] != 'ok' else 'green')}] "
-              f"{d['length']} karakter: {d['value']}")
+        mark = paint(sign[d["status"]], GREEN if d["status"] == "ok" else RED)
+        print(f"    {mark:<10} {d['length']} chars: {d['value']}")
 
-    print(f"\n{colorize('SERP Preview:', 'red')}")
+    print()
+    print(label_value("SERP preview", ""))
     print(render_serp_preview(
         result["title"]["value"] if result["title"] else None,
         response.url,

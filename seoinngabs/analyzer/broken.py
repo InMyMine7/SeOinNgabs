@@ -1,60 +1,57 @@
-"""Broken link checker (fix H1-H6).
-
-Perbaikan vs main.py lama:
-- Semua href di-resolve dengan urljoin sebelum dicek (fix H1: '/' tidak lagi
-  MissingSchema -> broken palsu).
-- Paralel + rate limit + timeout (fix H2).
-- HEAD dengan fallback GET untuk 405/501 (fix H3) dan klasifikasi 403/999
-  sebagai 'perlu review' bukan langsung broken (fix H5 via UA + klasifikasi).
-- Duplikat di-dedup (fix H6).
-"""
+"""Broken link checker."""
 
 from typing import List
 
 from bs4 import BeautifulSoup
 
-from ..core.output import colorize
-from ..core.url import join_url
+from ..core.ui import RED, YELLOW, ask_url, fail, header, paint, progress_done, progress_inline, success, warn
 from .fetch import fetch_page, parse_soup
-from .links import classify_links, check_urls_parallel
+from .links import check_link_status, classify_links, check_urls_parallel
+
+REVIEW_CODES = (403, 999)
 
 
 def collect_links(url: str, soup: BeautifulSoup) -> List[str]:
-    """Kumpulkan href absolut unik dari soup (dedup, skip non-http)."""
+    """Collect unique absolute hrefs from soup (dedup, skip non-http)."""
     result = classify_links(url, soup)
     return sorted({link["href"] for link in result["internal"] + result["external"]})
 
 
 def check_broken_links() -> None:
-    """Menu interaktif: temukan broken links di halaman."""
-    print("=====Check Broken Links=====")
-    url = input("\nMasukkan URL halaman: ").strip()
-    print("Tunggu sebentar proses ini memakan waktu cukup lama")
+    """Interactive: find broken links on a page."""
+    print(header("Broken Links Checker", "Parallel HEAD/GET verification"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
     links = collect_links(response.url, soup)
     if not links:
-        print(colorize("\nTidak ada link yang dapat diperiksa.", "green"))
+        print(warn("No checkable links found on this page."))
         return
 
-    results = check_urls_parallel(links)
+    print(f"\n  Checking {len(links)} links...")
+    results = check_urls_parallel(links, progress=False)
+    progress_inline(len(results), len(results), label="links")
+    progress_done()
 
-    broken = [r for r in results if r["error"] is None and r["status_code"] >= 400]
-    review = [r for r in results if r["error"] is None and r["status_code"] in (403, 999)]
+    broken = [r for r in results if r["error"] is None and r["status_code"] >= 400 and r["status_code"] not in REVIEW_CODES]
+    review = [r for r in results if r["error"] is None and r["status_code"] in REVIEW_CODES]
     errors = [r for r in results if r["error"] is not None]
 
+    print()
     if broken or review or errors:
-        print(colorize("\nTautan bermasalah ditemukan:", "red"))
         for r in broken:
-            print(f"[BROKEN {r['status_code']}] {r['url']}")
+            status = r["status_code"]
+            print(f"  {paint(f'[BROKEN {status}]', RED)} {r['url']}")
         for r in review:
-            print(f"[REVIEW {r['status_code']}] {r['url']} (403/999 — bisa jadi bot-block, cek manual)")
+            status = r["status_code"]
+            print(f"  {paint(f'[REVIEW {status}]', YELLOW)} {r['url']} (possible bot-block — check manually)")
         for r in errors:
-            print(f"[ERROR] {r['url']} ({r['error']})")
+            print(f"  {paint('[ERROR]', RED)} {r['url']} ({r['error']})")
+        print(f"\n  {len(broken)} broken, {len(review)} to review, {len(errors)} errors out of {len(results)} links.")
     else:
-        print(colorize("\nTidak ada tautan yang rusak ditemukan.", "green"))
+        print(success(f"No broken links found ({len(results)} links checked)."))

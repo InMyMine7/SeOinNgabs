@@ -136,34 +136,37 @@ def check_security(url: str) -> Dict:
 
 
 def check_security_interactive() -> None:
-    """Menu interaktif: audit HTTPS/SSL & security headers."""
-    print("=====HTTPS/SSL & Security Headers Checker=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: audit HTTPS/SSL & security headers."""
+    from ..core.ui import GREEN, RED, ask_url, fail, header, label_value, paint, warn
+
+    print(header("HTTPS/SSL & Security Headers", "Transport security and OWASP headers"))
+    url = ask_url()
     try:
         report = check_security(url)
     except Exception as e:
-        print("Terjadi kesalahan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
-    print(f"\n{colorize('HTTPS:', 'green')} {'aktif' if report['https'] else 'TIDAK — situs belum HTTPS'}")
+    print()
+    print(label_value("HTTPS", "enabled" if report["https"] else "NOT enabled"))
     if report["http_redirects_https"] is not None:
-        state = "ya" if report["http_redirects_https"] else "TIDAK"
-        print(f"HTTP -> HTTPS redirect: {state}")
+        print(label_value("HTTP->HTTPS", "yes" if report["http_redirects_https"] else "no"))
     if report["ssl"]:
         ssl_info = report["ssl"]
         if ssl_info["valid"]:
-            print(f"SSL: valid — kedaluwarsa {ssl_info['expires']} ({ssl_info['days_left']} hari lagi)")
+            print(label_value("Certificate", f"valid — expires {ssl_info['expires']} ({ssl_info['days_left']} days left)"))
         else:
-            print(colorize(f"SSL: bermasalah — {ssl_info['error']}", "red"))
-    print(f"\n{colorize('Security Headers:', 'green')}")
+            print(paint(f"  Certificate problem: {ssl_info['error']}", RED))
+
+    print(paint("  Security headers:", GREEN))
     for name, why in SECURITY_HEADERS.items():
         present = name.lower() in report["headers"] or (
             name == "X-Frame-Options" and "frame-ancestors" in report["headers"].get("content-security-policy", ""))
-        mark = colorize("OK", "green") if present else colorize("MISSING", "red")
-        print(f"  [{mark}] {name}")
+        mark = paint("OK      ", GREEN) if present else paint("MISSING ", RED)
+        print(f"    {mark} {name}")
     if report["missing_headers"]:
-        print(f"\n{colorize('Rekomendasi:', 'red')}")
+        print(warn("Recommendations:"))
         for m in report["missing_headers"]:
-            print(f"  - {m}")
+            print(f"    - {m}")
     for note in report["notes"]:
-        print(colorize(f"  [i] {note}", "red"))
+        print(warn(note))

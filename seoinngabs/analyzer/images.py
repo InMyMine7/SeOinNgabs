@@ -1,13 +1,4 @@
-"""Analisis kecepatan muat gambar (fix J1-J6).
-
-Perbaikan vs main.py lama:
-- Body benar-benar diunduh via iter_content — waktu + ukuran nyata (fix J1).
-- Normalisasi scheme (fix J2) dan penggabungan URL via urljoin (fix J4:
-  'page.html' + 'img.png' dan '//cdn' sekarang benar).
-- Lazy-load: data-src / data-original / srcset dikenali (fix J3).
-- Timeout/UA via session (fix J5).
-- Pesan gagal berwarna merah, PEP 8 (fix J6).
-"""
+"""Analisis kecepatan muat gambar."""
 
 import time
 from typing import List, Optional
@@ -15,16 +6,16 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from ..core.ui import GREEN, RED, ask_url, fail, header, label_value, paint, warn
 from ..core.http import get_session
-from ..core.output import colorize
 from .fetch import fetch_page, parse_soup
 
 
 def resolve_img_url(img_tag, base_url: str) -> Optional[str]:
-    """Cari URL gambar efektif dengan dukungan lazy-load (fix J3).
+    """Find the effective image URL, lazy-load aware.
 
-    Atribut lazy-load (data-src dst.) dicek duluan: pada gambar lazy, 'src'
-    biasanya hanya placeholder kecil sedangkan URL asli ada di data-src.
+    Lazy attributes (data-src etc.) take priority over 'src' because on
+    lazy images 'src' usually holds a tiny placeholder.
     """
     for attr in ("data-src", "data-original", "data-lazy-src", "src"):
         value = (img_tag.get(attr) or "").strip()
@@ -32,7 +23,6 @@ def resolve_img_url(img_tag, base_url: str) -> Optional[str]:
             return urljoin(base_url, value)
     srcset = (img_tag.get("srcset") or img_tag.get("data-srcset") or "").strip()
     if srcset:
-        # Ambil kandidat pertama dari srcset: "url 1x, url 2x, ..."
         first = srcset.split(",")[0].strip().split(" ")[0]
         if first and not first.startswith("data:"):
             return urljoin(base_url, first)
@@ -40,7 +30,7 @@ def resolve_img_url(img_tag, base_url: str) -> Optional[str]:
 
 
 def measure_image(url: str, timeout: tuple = (10, 30)) -> dict:
-    """Unduh gambar penuh, ukur waktu + ukuran (fix J1)."""
+    """Download an image fully and measure time + size."""
     session = get_session()
     start = time.monotonic()
     size = 0
@@ -57,7 +47,7 @@ def measure_image(url: str, timeout: tuple = (10, 30)) -> dict:
 
 
 def collect_image_urls(soup, base_url: str) -> List[str]:
-    """Kumpulkan URL gambar unik (termasuk lazy-load) dari soup."""
+    """Collect unique image URLs (including lazy) from soup."""
     urls = []
     seen = set()
     for img in soup.find_all("img"):
@@ -69,32 +59,34 @@ def collect_image_urls(soup, base_url: str) -> List[str]:
 
 
 def analyze_image_load_speed() -> None:
-    """Menu interaktif: ukur waktu muat semua gambar di halaman."""
-    print("===== Analyze Image Load Speed =====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: measure load time of every image on a page."""
+    from ..core.ui import ask_url, fail, header, label_value, paint, GREEN, warn
+
+    print(header("Image Load Speed", "Full-download timing per image"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         response.raise_for_status()
         soup = parse_soup(response.content)
     except Exception as e:
-        print(colorize(f"Gagal memeriksa kecepatan gambar untuk {url}: {e}", "red"))
+        print(fail(f"Request failed: {url}: {e}"))
         return
 
     images = collect_image_urls(soup, response.url)
     if not images:
-        print(colorize("Tidak ada gambar ditemukan di halaman.", "green"))
+        print(warn("No images found on this page."))
         return
 
-    for img_url in images:
+    print(f"\n  Measuring {len(images)} images...")
+    total_size = 0
+    for i, img_url in enumerate(images, 1):
         result = measure_image(img_url)
         if result["error"]:
-            print(colorize(f"Gagal memuat gambar di {img_url} ({result['error']})", "red"))
+            print(f"  {paint('[FAIL]', RED)} {img_url} — {result['error']}")
         else:
-            print(
-                colorize(
-                    "Gambar di {} ({} KB) memuat dalam waktu {:.2f} detik".format(
-                        img_url, result["size"] // 1024, result["load_time"]
-                    ),
-                    "green",
-                )
-            )
+            total_size += result["size"]
+            print(f"  {paint(f'{i:>3}.', GREEN)} {img_url}")
+            print(f"        {result['size'] // 1024} KB in {result['load_time']:.2f}s")
+    print()
+    print(label_value("Images", len(images)))
+    print(label_value("Total weight", f"{total_size // 1024} KB"))

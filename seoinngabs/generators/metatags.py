@@ -1,15 +1,9 @@
-"""Meta Tag Generator (fix N1-N4).
-
-Perbaikan vs main.py lama:
-- Semua input di-escape (fix N1: XSS/kutip tidak lagi merusak atribut).
-- Tag kosong tidak digenerate (fix N2).
-- twitter:card divalidasi (fix N3).
-- Konfirmasi menimpa + encoding utf-8 (fix N4).
-"""
+"""Meta tag generator with HTML escaping."""
 
 from pathlib import Path
 
-from ..core.output import colorize, escape_html
+from ..core.ui import GREEN, ask, confirm_overwrite, fail, header, paint, success, warn
+from ..core.ui import escape_html
 
 TWITTER_CARD_TYPES = {"summary", "summary_large_image", "player", "app"}
 
@@ -19,7 +13,7 @@ def validate_twitter_card(value: str) -> bool:
 
 
 def build_meta_tags(**fields) -> list:
-    """Susun daftar tag HTML dari field input (yang kosong dilewati)."""
+    """Build the list of HTML meta tags from non-empty fields."""
     tags = []
     e = escape_html
     if fields.get("title"):
@@ -50,34 +44,37 @@ def build_meta_tags(**fields) -> list:
 
 
 def generate_meta_tags() -> None:
-    """Menu interaktif: susun dan simpan meta tags ke meta_tags.html."""
-    print(colorize("===== Meta Tag Generator =====", "green"))
+    """Interactive: build and save meta tags to meta_tags.html."""
+    print(header("Meta Tag Generator", "Title, description, OG and Twitter tags"))
 
     fields = {
-        "title": input("\033[94mEnter the page title (e.g., My Website): \033[0m").strip(),
-        "description": input("\033[94mEnter the page description: \033[0m").strip(),
-        "keywords": input("\033[94mEnter the page keywords (comma separated): \033[0m").strip(),
-        "author": input("\033[94mEnter the author name (e.g., John Doe): \033[0m").strip(),
-        "canonical_url": input("\033[94mEnter the canonical URL of the page (optional): \033[0m").strip(),
-        "og_title": input("\033[94mEnter the Open Graph title (optional): \033[0m").strip(),
-        "og_description": input("\033[94mEnter the Open Graph description (optional): \033[0m").strip(),
-        "og_image": input("\033[94mEnter the Open Graph image URL (optional): \033[0m").strip(),
-        "twitter_card": input("\033[94mEnter Twitter card type (summary, summary_large_image, player, or app): \033[0m").strip(),
-        "twitter_title": input("\033[94mEnter Twitter title (optional): \033[0m").strip(),
-        "twitter_description": input("\033[94mEnter Twitter description (optional): \033[0m").strip(),
-        "twitter_image": input("\033[94mEnter Twitter image URL (optional): \033[0m").strip(),
+        "title": ask("Page title (e.g. My Website)"),
+        "description": ask("Page description"),
+        "keywords": ask("Keywords (comma separated)"),
+        "author": ask("Author name (e.g. John Doe)"),
+        "canonical_url": ask("Canonical URL (optional)"),
+        "og_title": ask("Open Graph title (optional)"),
+        "og_description": ask("Open Graph description (optional)"),
+        "og_image": ask("Open Graph image URL (optional)"),
+        "twitter_card": ask("Twitter card type (summary/summary_large_image/player/app)"),
+        "twitter_title": ask("Twitter title (optional)"),
+        "twitter_description": ask("Twitter description (optional)"),
+        "twitter_image": ask("Twitter image URL (optional)"),
     }
     if fields["twitter_card"] and not validate_twitter_card(fields["twitter_card"]):
-        print(colorize("Tipe twitter:card tidak dikenal; tag twitter:card diabaikan.", "red"))
+        print(warn("Unknown twitter:card type — the tag will be skipped."))
         fields["twitter_card"] = ""
 
     tags = build_meta_tags(**fields)
-    print(colorize("\nGenerated Meta Tags:\n", "green"))
+    if not tags:
+        print(fail("All fields were empty — nothing to generate."))
+        return
+    print(paint("  Generated meta tags:", GREEN))
     for tag in tags:
-        print(tag)
+        print(f"    {tag}")
 
     output_path = Path.cwd() / "meta_tags.html"
-    if output_path.exists() and input("meta_tags.html sudah ada. Timpa? (y/n): ").strip().lower() != "y":
+    if not confirm_overwrite(str(output_path)):
         return
     output_path.write_text("\n".join(tags) + "\n", encoding="utf-8")
-    print(colorize("Meta tags have been saved to 'meta_tags.html'.", "green"))
+    print(success(f"Meta tags saved to {output_path}"))

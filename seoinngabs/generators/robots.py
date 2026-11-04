@@ -1,20 +1,12 @@
-"""Generator robots.txt (fix M1-M4).
-
-Perbaikan vs main.py lama:
-- Satu grup User-agent * dengan banyak Disallow (fix M1: tidak ada lagi
-  grup duplikat).
-- Selalu ada grup default sehingga Crawl-delay/Sitemap tidak orphan (fix M2).
-- Path wajib diawali '/', trailing newline (fix M3).
-- Konfirmasi sebelum menimpa (fix M4).
-"""
+"""Generator robots.txt with correct group syntax."""
 
 from pathlib import Path
 
-from ..core.output import colorize
+from ..core.ui import ask, confirm_overwrite, fail, header, success
 
 
 def validate_robot_path(path: str) -> bool:
-    """Path robots.txt valid: diawali '/', tanpa karakter kontrol."""
+    """A robots.txt path must start with '/' and contain no control chars."""
     return bool(path) and path.startswith("/") and "\n" not in path and "\r" not in path
 
 
@@ -25,15 +17,7 @@ def build_robots_txt(
     crawl_delay: str = "",
     sitemap: str = "",
 ) -> str:
-    """Susun konten robots.txt.
-
-    Args:
-        allow_all: izinkan semua bot (Disallow kosong).
-        disallow_paths: list path untuk User-agent: *.
-        bot_rules: list of (bot_name, [paths]).
-        crawl_delay: nilai Crawl-delay (string, '' = tidak ada).
-        sitemap: URL sitemap ('' = tidak ada).
-    """
+    """Assemble robots.txt content."""
     lines = []
 
     if allow_all:
@@ -60,63 +44,52 @@ def build_robots_txt(
     return "\n".join(lines) + "\n"
 
 
-def _confirm_overwrite(path: Path) -> bool:
-    if not path.exists():
-        return True
-    return input(f"{path.name} sudah ada. Timpa? (y/n): ").strip().lower() == "y"
-
-
 def generate_robots_txt() -> None:
-    """Menu interaktif: susun dan simpan robots.txt."""
-    print(colorize("===== robots.txt File Generator =====", "green"))
+    """Interactive: build and save robots.txt."""
+    print(header("robots.txt Generator", "Crawler rules and sitemap location"))
 
-    print("\033[94m1. Allow or Disallow All Bots\033[0m")
-    allow_all = input("Do you want to allow all bots to crawl the site? (y/n): ").strip().lower() == "y"
+    allow_all = ask("Allow all bots to crawl the site? (y/n)", "y").lower() == "y"
 
     disallow_paths = []
     if not allow_all:
-        print("\033[94m2. Disallow Specific Paths\033[0m")
-        if input("Do you want to disallow specific paths? (y/n): ").strip().lower() == "y":
+        if ask("Disallow specific paths? (y/n)", "n").lower() == "y":
             while True:
-                path = input("Enter the path to disallow (e.g., /private/): ").strip()
+                path = ask("Path to disallow (e.g. /private/)")
                 if validate_robot_path(path):
                     disallow_paths.append(path)
                 else:
-                    print(colorize("Path harus diawali '/'.", "red"))
-                if input("Do you want to add another path? (y/n): ").strip().lower() != "y":
+                    print(fail("Path must start with '/'."))
+                if ask("Add another path? (y/n)", "n").lower() != "y":
                     break
 
     bot_rules = []
-    print("\033[94m3. Allow Specific Bots\033[0m")
-    if input("Do you want to specify rules for individual bots? (y/n): ").strip().lower() == "y":
+    if ask("Add rules for specific bots? (y/n)", "n").lower() == "y":
         while True:
-            bot_name = input("Enter the bot name (e.g., Googlebot): ").strip()
+            bot_name = ask("Bot name (e.g. Googlebot)")
             paths = []
-            if input(f"Do you want to disallow any paths for {bot_name}? (y/n): ").strip().lower() == "y":
+            if ask(f"Disallow paths for {bot_name}? (y/n)", "n").lower() == "y":
                 while True:
-                    path = input(f"Enter the path to disallow for {bot_name} (e.g., /private/): ").strip()
+                    path = ask(f"Path to disallow for {bot_name}")
                     if validate_robot_path(path):
                         paths.append(path)
                     else:
-                        print(colorize("Path harus diawali '/'.", "red"))
-                    if input("Do you want to add another path for this bot? (y/n): ").strip().lower() != "y":
+                        print(fail("Path must start with '/'."))
+                    if ask("Add another path? (y/n)", "n").lower() != "y":
                         break
             bot_rules.append((bot_name, paths))
-            if input("Do you want to add another bot? (y/n): ").strip().lower() != "y":
+            if ask("Add another bot? (y/n)", "n").lower() != "y":
                 break
 
     crawl_delay = ""
-    print("\033[94m4. Set Crawl Delay\033[0m")
-    if input("Do you want to set a crawl delay for all bots? (y/n): ").strip().lower() == "y":
-        crawl_delay = input("Enter the delay time in seconds (e.g., 10): ").strip()
+    if ask("Set a crawl delay for all bots? (y/n)", "n").lower() == "y":
+        crawl_delay = ask("Delay in seconds (e.g. 10)", "10")
 
     sitemap = ""
-    print("\033[94m5. Add Sitemap Location\033[0m")
-    if input("Do you want to add the location of your sitemap? (y/n): ").strip().lower() == "y":
-        sitemap = input("Enter the URL of your sitemap (e.g., https://example.com/sitemap.xml): ").strip()
+    if ask("Add a sitemap location? (y/n)", "n").lower() == "y":
+        sitemap = ask("Sitemap URL (e.g. https://example.com/sitemap.xml)")
 
     output_path = Path.cwd() / "robots.txt"
-    if not _confirm_overwrite(output_path):
+    if not confirm_overwrite(str(output_path)):
         return
 
     content = build_robots_txt(
@@ -127,4 +100,4 @@ def generate_robots_txt() -> None:
         sitemap=sitemap,
     )
     output_path.write_text(content, encoding="utf-8")
-    print(colorize("robots.txt file has been generated and saved.", "green"))
+    print(success(f"robots.txt written to {output_path}"))

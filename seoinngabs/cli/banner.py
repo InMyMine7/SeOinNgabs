@@ -1,48 +1,70 @@
-"""Banner ASCII dan daftar menu (dipindah dari main.py lama)."""
+"""Terminal banner and menu item definitions (English UI)."""
 
-from ..core.output import colorize
+from ..core.ui import BOLD, CYAN, DIM, GREEN, WHITE, paint
 
-BANNER = """ _____     _____ _     _____         _
-|   __|___|     |_|___|   | |___ ___| |_ ___
-|__   | -_|  |  | |   | | | | . | .'| . |_ -|
-|_____|___|_____|_|_|_|_|___|_  |__,|___|___|
-                            |___|        
-[Coded By '/Mine7 || github.com/InMyMine7 || t.me/InMyMineee]
+BANNER = r"""
+ _____ _     _____         _
+|   __|_|___|     |___ ___| |_ ___
+|__   | | -_|  |  | | . | .'| . |_ -|
+|_____|_|___|_____|_|___|__,|___|___|
 """
 
 MENU_ITEMS = [
-    ("1", "Google Trends Scrapper"),
-    ("2", "Keyword Research"),
-    ("3", "Backlink Generator"),
-    ("4", "Check Status Url"),
-    ("5", "Check Title, Meta, URL Canonical"),
-    ("6", "h1, h2, h3, h4, h5, h6 checker"),
-    ("7", "Check backlink internal dan external beserta anchor text"),
-    ("8", "Check Broken Links"),
-    ("9", "Analisa link 403 dan 301"),
-    ("10", "Analisis Kecepatan Muat Gambar di Halaman"),
-    ("11", "Keyword Density Checker Tool"),
-    ("12", ".htaccess File Generator Tool"),
-    ("13", "Robots.txt Generator Tool"),
-    ("14", "Meta Tag Generator"),
-    ("15", "Terms Of Services Generator Tool"),
-    ("16", "Privacy Policy Generator Tool"),
-    ("17", "Disclaimer Generator Tool"),
-    ("18", "Open Graph / Twitter Card Checker"),
-    ("19", "Image Alt Checker"),
-    ("20", "Title & Meta Length Checker + SERP Preview"),
-    ("21", "Redirect Chain Tracer"),
-    ("22", "Site Crawler"),
-    ("23", "Sitemap Generator"),
-    ("24", "Sitemap Validator"),
-    ("25", "Schema.org JSON-LD Generator"),
-    ("26", "Export CSV/JSON/HTML + Batch Mode"),
-    ("27", "HTTPS/SSL & Security Headers Checker"),
+    ("Research", [
+        ("1", "Google Trends Scraper"),
+        ("2", "Keyword Research"),
+    ]),
+    ("Backlinks & Links", [
+        ("3", "Backlink Generator"),
+        ("7", "Internal/External Links + Anchor Text"),
+        ("8", "Broken Links Checker"),
+        ("9", "403/301 Redirect Analysis"),
+    ]),
+    ("On-Page Analysis", [
+        ("4", "URL Status Checker"),
+        ("5", "Title, Meta & Canonical"),
+        ("6", "Heading Structure (h1-h6)"),
+        ("10", "Image Load Speed"),
+        ("11", "Keyword Density Checker"),
+    ]),
+    ("New Checkers", [
+        ("18", "Open Graph / Twitter Card Checker"),
+        ("19", "Image Alt Checker"),
+        ("20", "Title & Meta Length + SERP Preview"),
+        ("21", "Redirect Chain Tracer"),
+        ("27", "HTTPS/SSL & Security Headers"),
+    ]),
+    ("Crawling & Reporting", [
+        ("22", "Site Crawler"),
+        ("23", "Sitemap Generator"),
+        ("24", "Sitemap Validator"),
+        ("26", "Export CSV/JSON/HTML + Batch Mode"),
+    ]),
+    ("Generators", [
+        ("12", ".htaccess Generator"),
+        ("13", "robots.txt Generator"),
+        ("14", "Meta Tag Generator"),
+        ("15", "Terms of Service Generator"),
+        ("16", "Privacy Policy Generator"),
+        ("17", "Disclaimer Generator"),
+        ("25", "Schema.org JSON-LD Generator"),
+    ]),
 ]
 
 
+def render_banner() -> str:
+    """Render the ASCII banner with a tagline."""
+    return paint(BANNER.lstrip("\n"), CYAN) + paint("SEO Toolkit for the command line\n", DIM)
+
+
 def render_menu() -> str:
-    """Render banner + daftar menu."""
-    lines = [BANNER]
-    lines.extend(f"{num}. {label}" for num, label in MENU_ITEMS)
+    """Render the grouped menu (category headers in bold)."""
+    lines = [render_banner()]
+    for category, items in MENU_ITEMS:
+        lines.append(paint(f"  {category}", BOLD, WHITE))
+        for number, label in items:
+            num = paint(f"{number:>2}", GREEN)
+            lines.append(f"    {num}  {label}")
+        lines.append("")
+    lines.append(paint("    0   Exit", GREEN))
     return "\n".join(lines)

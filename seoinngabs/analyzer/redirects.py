@@ -1,54 +1,45 @@
-"""Analisis link 403/301 + redirect chain tracer (fix I1-I4).
+"""Analisis link 403/301 + redirect chain tracer."""
 
-Perbaikan vs main.py lama:
-- allow_redirects=False sehingga 301 benar-benar terdeteksi (fix I1).
-- urljoin untuk link relatif (fix I2) — tidak ada lagi skip diam-diam.
-- Deteksi 403 eksplisit (fix I4: nama fitur '403 dan 301' akhirnya sesuai).
-- Paralel + timeout (fix I3).
-"""
-
-from typing import List, Optional
-
-from bs4 import BeautifulSoup
-
-from ..core.output import colorize
+from ..core.ui import ask_url, fail, header, paint, GREEN, RED, warn, progress_done, progress_inline
 from .fetch import fetch_page, parse_soup
 from .links import check_link_status, check_urls_parallel, classify_links
 
+REDIRECT_CODES = (301, 302, 307, 308)
+
 
 def analyze_404_301_links() -> None:
-    """Menu interaktif: daftar link 404 dan 301 di halaman."""
-    print("=====Analisa link 404 dan 301=====")
-    url = input("\nMasukkan URL halaman: ").strip()
-    print("Tunggu sebentar proses ini memakan waktu cukup lama")
+    """Interactive: list 404/301/403 links found on a page."""
+    print(header("403/301 Redirect Analysis", "Per-link status verification"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
     result = classify_links(response.url, soup)
     links = sorted({l["href"] for l in result["internal"] + result["external"]})
     if not links:
-        print(colorize("Tidak ada link yang dapat diperiksa.", "green"))
+        print(warn("No checkable links found on this page."))
         return
 
-    statuses = check_urls_parallel(links)
+    print(f"\n  Checking {len(links)} links...")
+    statuses = check_urls_parallel(links, progress=False)
+    progress_inline(len(statuses), len(statuses), label="links")
+    progress_done()
 
-    links_404 = [s for s in statuses if s["status_code"] == 404]
-    links_301 = [s for s in statuses if s["status_code"] in (301, 302, 307, 308)]
-    links_403 = [s for s in statuses if s["status_code"] == 403]
-
-    for label, items, code_hint in [
-        ("404", links_404, "Tautan internal dengan kode 404 ditemukan"),
-        ("301", links_301, "Tautan internal dengan kode 301 ditemukan"),
-        ("403", links_403, "Tautan internal dengan kode 403 ditemukan (bot-block?)"),
-    ]:
+    groups = [
+        ("404", [s for s in statuses if s["status_code"] == 404], "Links returning 404"),
+        ("301/302", [s for s in statuses if s["status_code"] in REDIRECT_CODES], "Links redirecting (301/302/307/308)"),
+        ("403", [s for s in statuses if s["status_code"] == 403], "Links returning 403 (bot-block?)"),
+    ]
+    print()
+    for label, items, title in groups:
         if items:
-            print(colorize(f"\n{code_hint}:", "red"))
+            print(paint(f"  {title}:", RED))
             for r in items:
                 extra = f" -> {r['final_url']}" if r.get("redirected") else ""
-                print(f"{r['url']}{extra}")
+                print(f"    {r['url']}{extra}")
         else:
-            print(colorize(f"\nTidak ada tautan {label} ditemukan.", "green"))
+            print(paint(f"  No {label} links found.", GREEN))

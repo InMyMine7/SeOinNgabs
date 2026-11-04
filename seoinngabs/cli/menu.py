@@ -1,4 +1,4 @@
-"""Menu interaktif SeOinNgabs (fix P5: loop, bukan sekali jalan)."""
+"""Interactive menu loop (English UI, grouped menu, numbered prompts)."""
 
 from ..analyzer import alt
 from ..analyzer.backlinks_gen import generate_backlinks
@@ -11,11 +11,11 @@ from ..analyzer.images import analyze_image_load_speed
 from ..analyzer.links import analyze_backlinks
 from ..analyzer.meta import check_title_meta_canonical
 from ..analyzer.og import check_og_twitter
-from ..analyzer.redirects import analyze_404_301_links
 from ..analyzer.redirect_tracer import trace_redirects_interactive
-from ..analyzer.serp import check_title_meta_lengths
+from ..analyzer.redirects import analyze_404_301_links
 from ..analyzer.security import check_security_interactive
-from ..core.output import clear_screen, colorize
+from ..analyzer.serp import check_title_meta_lengths
+from ..core.ui import CYAN, DIM, GREEN, ask, clear_screen, fail, header, info, paint, pause, success, warn
 from ..export.exporters import export_interactive
 from ..generators.htaccess import generate_htaccess
 from ..generators.legal import generate_disclaimer, generate_privacy_policy, generate_terms
@@ -23,34 +23,67 @@ from ..generators.metatags import generate_meta_tags
 from ..generators.robots import generate_robots_txt
 from ..generators.schema import generate_schema_interactive
 from ..generators.sitemap import generate_sitemap_interactive, validate_sitemap_interactive
-from ..research.keywords import research_keyword
-from ..research.trends import format_trends, get_trending_searches
+from ..research.keywords import list_available_languages, research_keyword
+from ..research.trends import format_trends, get_trending_searches, list_available_geos
 from .banner import render_menu
 
 EXIT_CHOICES = {"0", "q", "quit", "exit"}
 
 
 def _trends_action() -> None:
-    """Menu 1: tampilkan trending searches; error ditangkap agar menu tetap hidup."""
+    """Menu 1: trending searches with geo selection."""
+    geos = list_available_geos()
+    print(header("Google Trends Scraper", "Trending searches in your region"))
+    print(paint("  Available regions:", DIM))
+    codes = list(geos.keys())
+    # tampilkan 16 pertama dalam 2 kolom + opsi lain
+    for i in range(0, min(16, len(codes)), 2):
+        left = f"{codes[i]:>2} {geos[codes[i]]:<16}"
+        right = f"{codes[i+1]:>2} {geos[codes[i+1]]}" if i + 1 < len(codes) else ""
+        print(f"    {left}  {right}")
+    print(paint("    .. or any other Google Trends geo code", DIM))
+    geo = ask("Region code", "ID").upper()
     try:
-        trends = get_trending_searches()
-        print(format_trends(trends))
+        limit = int(ask("Max results", "20"))
+    except ValueError:
+        limit = 20
+    try:
+        trends = get_trending_searches(geo=geo, limit=limit)
     except Exception as e:
-        print(colorize(f"Gagal mengambil Google Trends: {e}", "red"))
+        print(fail(f"Could not fetch Google Trends: {e}"))
+        return
+    if not trends:
+        print(warn(f"No trending results for region {geo}."))
+        return
+    print()
+    print(format_trends(trends, geo=geo))
 
 
 def _keyword_action() -> None:
-    """Menu 2: riset keyword."""
-    print("=====Keyword Research=====")
-    keyword = input("Keyword Research Tool: ").strip()
+    """Menu 2: keyword research with language selection."""
+    languages = list_available_languages()
+    print(header("Keyword Research", "Google Suggest autocomplete"))
+    keyword = ask("Base keyword")
     if not keyword:
-        print(colorize("Keyword tidak dimasukkan.", "red"))
+        print(fail("Keyword cannot be empty."))
         return
+    print(paint("  Common languages:", DIM))
+    codes = list(languages.keys())
+    for i in range(0, min(16, len(codes)), 4):
+        row = "  ".join(f"{c}:{languages[c][:10]:<10}" for c in codes[i:i+4])
+        print(f"    {row}")
+    hl = ask("Language code", "id").lower()
     try:
-        for suggestion in research_keyword(keyword):
-            print(suggestion)
+        suggestions = research_keyword(keyword, hl=hl)
     except Exception as e:
-        print(colorize(f"Gagal mengambil saran keyword: {e}", "red"))
+        print(fail(f"Could not fetch suggestions: {e}"))
+        return
+    if not suggestions:
+        print(warn("No suggestions found."))
+        return
+    print()
+    for i, s in enumerate(suggestions, 1):
+        print(f"  {paint(f'{i:>2}.', GREEN)} {s}")
 
 
 ACTIONS = {
@@ -85,25 +118,25 @@ ACTIONS = {
 
 
 def run_menu(once: bool = False) -> None:
-    """Jalankan menu interaktif.
+    """Run the interactive menu loop.
 
     Args:
-        once: bila True, hanya satu kali lalu keluar (untuk kompatibilitas
-            script lama / testing).
+        once: run a single action then return (for testing/compatibility).
     """
     while True:
         clear_screen()
         print(render_menu())
         try:
-            choice = input("Choose an option (1-27, 0/q untuk keluar): ").strip().lower()
+            choice = input(paint("  Choose an option (1-27, 0 = exit): ", CYAN, )).strip().lower()
         except (EOFError, KeyboardInterrupt):
             print()
             return
         if choice in EXIT_CHOICES:
+            print(paint("  Goodbye!", GREEN))
             return
         action = ACTIONS.get(choice)
         if action is None:
-            print(colorize("Pilihan tidak valid.", "red"))
+            print(fail("Invalid choice — pick a number from the menu."))
         else:
             try:
                 action()
@@ -111,7 +144,7 @@ def run_menu(once: bool = False) -> None:
                 print()
                 return
             except Exception as e:
-                print(colorize(f"Terjadi kesalahan: {e}", "red"))
+                print(fail(f"Something went wrong: {e}"))
         if once:
             return
-        input("\nTekan Enter untuk kembali ke menu...")
+        pause()

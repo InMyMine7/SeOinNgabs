@@ -93,38 +93,37 @@ def crawl_site(
 
 
 def crawl_site_interactive() -> None:
-    """Menu interaktif: crawl situs dan laporkan hasilnya."""
-    print("=====Site Crawler=====")
-    url = input("\nMasukkan URL awal: ").strip()
-    try:
-        depth = int(input("Kedalaman maksimum (default 2): ").strip() or "2")
-    except ValueError:
-        depth = 2
-    try:
-        pages = int(input("Jumlah halaman maksimum (default 20): ").strip() or "20")
-    except ValueError:
-        pages = 20
+    """Interactive: crawl a site and report results."""
+    from ..core.ui import GREEN, RED, ask_int, ask_url, fail, header, label_value, paint, warn
 
-    print(f"\nCrawling {url} (depth={depth}, max {pages} halaman, robots.txt dihormati)...")
+    print(header("Site Crawler", "BFS crawl honoring robots.txt and rate limits"))
+    url = ask_url("Start URL")
+    depth = ask_int("Max depth", 2, minimum=0, maximum=10)
+    pages = ask_int("Max pages", 20, minimum=1, maximum=500)
+
+    print(f"\n  Crawling {url} (depth={depth}, max {pages} pages, robots.txt honored)...")
     try:
         results = crawl_site(url, max_depth=depth, max_pages=pages)
     except Exception as e:
-        print("Terjadi kesalahan:", e)
+        print(fail(f"Crawl failed: {e}"))
         return
 
     if not results:
-        print(colorize("Tidak ada halaman yang berhasil di-crawl.", "red"))
+        print(warn("No pages were crawled."))
         return
 
     for r in results:
+        depth = r["depth"]
         if r["error"]:
-            print(f"  [ERROR d{r['depth']}] {r['url']} — {r['error']}")
+            print(f"  {paint(f'[ERROR d{depth}]', RED)} {r['url']} — {r['error']}")
         elif r["status"] == "robots-disallow":
-            print(f"  [{colorize('ROBOTS', 'red')}] {r['url']} (dilarang robots.txt)")
+            print(f"  {paint('[ROBOTS]', RED)} {r['url']} (blocked by robots.txt)")
         elif r["status"] == 200:
-            print(f"  [{colorize('OK', 'green')} d{r['depth']}] {r['url']} ({r['links']} link)")
+            print(f"  {paint(f'[OK d{depth}]', GREEN)} {r['url']} ({r['links']} links)")
         else:
-            print(f"  [{colorize(r['status'], 'red')} d{r['depth']}] {r['url']}")
+            print(f"  {paint(f'[{r['status']} d{depth}]', RED)} {r['url']}")
 
     ok = sum(1 for r in results if r["status"] == 200)
-    print(colorize(f"\nSelesai: {ok}/{len(results)} halaman OK, depth maks {max(r['depth'] for r in results)}.", "green"))
+    print()
+    print(label_value("Pages OK", f"{ok}/{len(results)}"))
+    print(label_value("Max depth reached", max(r["depth"] for r in results)))

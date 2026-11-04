@@ -1,23 +1,18 @@
-"""Pemeriksa heading h1-h6 (fix F1-F4).
-
-Baru: deteksi h1 ganda, lompatan level, heading kosong — sambil tetap
-mencetak semua heading seperti perilaku lama.
-"""
+"""Pemeriksa heading h1-h6 with structure validation."""
 
 from typing import List, Tuple
 
 from bs4 import BeautifulSoup
 
-from ..core.output import COLORS, colorize
 from .fetch import fetch_page, parse_soup
 
 
 def analyze_headings(soup: BeautifulSoup) -> dict:
-    """Analisis struktur heading.
+    """Analyze heading structure.
 
     Returns:
-        dict: headings (list (tag, teks)), h1_count, empty_headings,
-        skipped_levels (list pesan lompatan).
+        dict: headings (list (tag, text)), h1_count, empty_headings,
+        skipped_levels (list of jump messages).
     """
     headings: List[Tuple[str, str]] = []
     empty: List[str] = []
@@ -31,7 +26,7 @@ def analyze_headings(soup: BeautifulSoup) -> dict:
         if not text:
             empty.append(tag.name)
         if level > prev_level + 1 and prev_level != 0:
-            skipped.append(f"h{prev_level} -> h{level} ({text or '(kosong)'})")
+            skipped.append(f"h{prev_level} -> h{level} ({text or '(empty)'})")
         prev_level = level
 
     h1_count = sum(1 for name, _ in headings if name == "h1")
@@ -44,26 +39,35 @@ def analyze_headings(soup: BeautifulSoup) -> dict:
 
 
 def check_headings() -> None:
-    """Menu interaktif: cetak semua heading + peringatan struktur."""
-    print("=====h1, h2, h3, h4, h5, h6 checker=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: print all headings plus structure warnings."""
+    from ..core.ui import ask_url, fail, header, heading_colored, paint, RED, warn
+
+    print(header("Heading Structure", "h1-h6 hierarchy check"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
     result = analyze_headings(soup)
+    if not result["headings"]:
+        print(warn("No heading tags found on this page."))
+        return
+    print()
     for name, text in result["headings"]:
-        color = COLORS.get(name, COLORS["reset"])
-        print(f"{color}{name}: {text or '(kosong)'}{COLORS['reset']}")
+        print("  " + heading_colored(int(name[1]), text or "(empty)"))
 
+    print()
     if result["h1_count"] == 0:
-        print(colorize("\n[!] Tidak ada h1 di halaman ini.", "red"))
+        print(warn("No <h1> found on this page."))
     elif result["h1_count"] > 1:
-        print(colorize(f"\n[!] Ditemukan {result['h1_count']} h1 — sebaiknya hanya satu.", "red"))
+        print(warn(f"{result['h1_count']} <h1> tags found — keep exactly one."))
     if result["empty_headings"]:
-        print(colorize(f"[!] Heading kosong: {', '.join(result['empty_headings'])}", "red"))
+        print(warn(f"Empty headings: {', '.join(result['empty_headings'])}"))
     for s in result["skipped_levels"]:
-        print(colorize(f"[!] Lompatan level: {s}", "red"))
+        print(paint(f"  ! Level jump: {s}", RED))
+    if result["h1_count"] == 1 and not result["empty_headings"] and not result["skipped_levels"]:
+        from ..core.ui import success
+        print(success("Heading structure looks good."))

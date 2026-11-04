@@ -72,32 +72,36 @@ def og_twitter_recommendations(tags: Dict[str, Optional[str]]) -> List[str]:
 
 
 def check_og_twitter() -> None:
-    """Menu interaktif: laporkan kelengkapan OG/Twitter Card halaman."""
-    print("=====Open Graph / Twitter Card Checker=====")
-    url = input("\nMasukkan URL halaman: ").strip()
+    """Interactive: report OG/Twitter Card completeness of a page."""
+    from ..core.ui import GREEN, RED, ask_url, fail, header, paint, success, warn
+
+    print(header("Open Graph / Twitter Card", "Social preview metadata"))
+    url = ask_url()
     try:
         response = fetch_page(url)
         soup = parse_soup(response.content)
     except Exception as e:
-        print("Terjadi kesalahan permintaan:", e)
+        print(fail(f"Request failed: {e}"))
         return
 
     tags = analyze_og_twitter(soup)
-    print(f"\n{colorize('Open Graph:', 'green')}")
+    print()
+    print(paint("  Open Graph:", GREEN))
     for name in OG_REQUIRED + OG_OPTIONAL:
         value = tags[name]
-        status = colorize("OK", "green") if value else colorize("MISSING", "red")
-        print(f"  [{status}] {name}: {value or '-'}")
-    print(f"\n{colorize('Twitter Card:', 'green')}")
+        mark = paint("OK      ", GREEN) if value else paint("MISSING ", RED)
+        print(f"    {mark} {name:<22} {value or '-'}")
+    print(paint("  Twitter Card:", GREEN))
     for name in TWITTER_REQUIRED + TWITTER_OPTIONAL:
         value = tags[name]
-        status = colorize("OK", "green") if value else colorize("MISSING", "red")
-        print(f"  [{status}] {name}: {value or '-'}")
+        mark = paint("OK      ", GREEN) if value else paint("MISSING ", RED)
+        print(f"    {mark} {name:<22} {value or '-'}")
 
     recs = og_twitter_recommendations(tags)
+    print()
     if recs:
-        print(f"\n{colorize('Rekomendasi:', 'red')}")
+        print(warn("Recommendations:"))
         for i, rec in enumerate(recs, 1):
-            print(f"  {i}. {rec}")
+            print(f"    {i}. {rec}")
     else:
-        print(colorize("\nSemua tag OG dan Twitter Card lengkap.", "green"))
+        print(success("All OG and Twitter Card tags are present."))
