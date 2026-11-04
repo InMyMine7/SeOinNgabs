@@ -3,10 +3,11 @@
 from ..core.ui import BOLD, CYAN, DIM, GREEN, WHITE, paint
 
 BANNER = r"""
- _____ _     _____         _
-|   __|_|___|     |___ ___| |_ ___
-|__   | | -_|  |  | | . | .'| . |_ -|
-|_____|_|___|_____|_|___|__,|___|___|
+ _____     _____ _     _____         _       
+|   __|___|     |_|___|   | |___ ___| |_ ___ 
+|__   | -_|  |  | |   | | | | . | .'| . |_ -|
+|_____|___|_____|_|_|_|_|___|_  |__,|___|___|
+                            |___|                              
 """
 
 MENU_ITEMS = [
@@ -50,15 +51,12 @@ MENU_ITEMS = [
         ("25", "Schema.org JSON-LD Generator"),
     ]),
 ]
-
-
+ 
 def render_banner() -> str:
-    """Render the ASCII banner with a tagline."""
-    return paint(BANNER.lstrip("\n"), CYAN) + paint("SEO Toolkit for the command line\n", DIM)
+    return paint(BANNER.lstrip("\n"), GREEN) + paint("Coded By '/Mine7 | github.com/InMyMine7 | t.me/minesepen\n", WHITE)
 
 
 def render_menu() -> str:
-    """Render the grouped menu (category headers in bold)."""
     lines = [render_banner()]
     for category, items in MENU_ITEMS:
         lines.append(paint(f"  {category}", BOLD, WHITE))
