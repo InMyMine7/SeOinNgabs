@@ -22,7 +22,7 @@ from .links import classify_links, check_urls_parallel
 def collect_links(url: str, soup: BeautifulSoup) -> List[str]:
     """Kumpulkan href absolut unik dari soup (dedup, skip non-http)."""
     result = classify_links(url, soup)
-    return sorted({*result["internal"], *result["external"]})
+    return sorted({link["href"] for link in result["internal"] + result["external"]})
 
 
 def check_broken_links() -> None:

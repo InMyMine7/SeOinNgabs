@@ -1,7 +1,9 @@
 """Test analyzer.broken & redirects — urljoin, 301 terdeteksi, fallback GET (fix H1, H3, I1, I2)."""
 
 import responses
+from bs4 import BeautifulSoup
 
+from seoinngabs.analyzer.broken import collect_links
 from seoinngabs.analyzer.links import check_link_status
 
 
@@ -52,3 +54,26 @@ class TestRelativeLinksNotBroken:
         assert join_url(base, "/about") == "https://example.com/about"
         # Jika di-resolve, check_link_status tidak menerima path relatif
         assert join_url(base, "page.html") == "https://example.com/page/page.html"
+
+
+class TestCollectLinks:
+    """Regresi: collect_links harus mengembalikan list of str (bukan crash)."""
+
+    def test_returns_string_urls(self):
+        # bug: sorted({*internal, *external}) melempar TypeError 'unhashable
+        # type: dict' karena internal/external adalah list of dict
+        soup = BeautifulSoup(
+            '<a href="/x">a</a><a href="https://other.com/y">b</a><a href="/x">dup</a>',
+            "html.parser",
+        )
+        links = collect_links("https://ngokang.my.id", soup)
+        assert links == ["https://ngokang.my.id/x", "https://other.com/y"]
+        assert all(isinstance(link, str) for link in links)
+
+    def test_dedup_and_only_hrefs(self):
+        soup = BeautifulSoup(
+            '<a href="/a">a</a><a href="/a">b</a><a href="mailto:x@y.com">m</a>',
+            "html.parser",
+        )
+        links = collect_links("https://site.com", soup)
+        assert links == ["https://site.com/a"]
