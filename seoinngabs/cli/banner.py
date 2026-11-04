@@ -32,6 +32,7 @@ MENU_ITEMS = [
     ("19", "Image Alt Checker"),
     ("20", "Title & Meta Length Checker + SERP Preview"),
     ("21", "Redirect Chain Tracer"),
+    ("22", "Site Crawler"),
 ]
 
 

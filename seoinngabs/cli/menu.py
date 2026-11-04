@@ -3,6 +3,7 @@
 from ..analyzer import alt
 from ..analyzer.backlinks_gen import generate_backlinks
 from ..analyzer.broken import check_broken_links
+from ..analyzer.crawler import crawl_site_interactive
 from ..analyzer.density import check_keyword_density
 from ..analyzer.fetch import check_url_status
 from ..analyzer.headings import check_headings
@@ -70,6 +71,7 @@ ACTIONS = {
     "19": alt.check_image_alts,
     "20": check_title_meta_lengths,
     "21": trace_redirects_interactive,
+    "22": crawl_site_interactive,
 }
 
 
@@ -84,7 +86,7 @@ def run_menu(once: bool = False) -> None:
         clear_screen()
         print(render_menu())
         try:
-            choice = input("Choose an option (1-21, 0/q untuk keluar): ").strip().lower()
+            choice = input("Choose an option (1-22, 0/q untuk keluar): ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print()
             return
