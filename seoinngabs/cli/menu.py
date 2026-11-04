@@ -15,6 +15,7 @@ from ..analyzer.redirects import analyze_404_301_links
 from ..analyzer.redirect_tracer import trace_redirects_interactive
 from ..analyzer.serp import check_title_meta_lengths
 from ..core.output import clear_screen, colorize
+from ..export.exporters import export_interactive
 from ..generators.htaccess import generate_htaccess
 from ..generators.legal import generate_disclaimer, generate_privacy_policy, generate_terms
 from ..generators.metatags import generate_meta_tags
@@ -77,6 +78,7 @@ ACTIONS = {
     "23": generate_sitemap_interactive,
     "24": validate_sitemap_interactive,
     "25": generate_schema_interactive,
+    "26": export_interactive,
 }
 
 
@@ -91,7 +93,7 @@ def run_menu(once: bool = False) -> None:
         clear_screen()
         print(render_menu())
         try:
-            choice = input("Choose an option (1-25, 0/q untuk keluar): ").strip().lower()
+            choice = input("Choose an option (1-26, 0/q untuk keluar): ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print()
             return

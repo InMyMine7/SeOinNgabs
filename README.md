@@ -29,6 +29,7 @@ CLI tool SEO berbasis Python 3. Semua request memakai timeout, User-Agent jelas,
     <li>Site Crawler</li>
     <li>Sitemap Generator & Validator</li>
     <li>Schema.org JSON-LD Generator</li>
+    <li>Export CSV/JSON/HTML + Batch Mode</li>
 </ul>
 
 ## Installation
