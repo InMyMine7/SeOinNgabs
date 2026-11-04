@@ -35,6 +35,7 @@ MENU_ITEMS = [
     ("22", "Site Crawler"),
     ("23", "Sitemap Generator"),
     ("24", "Sitemap Validator"),
+    ("25", "Schema.org JSON-LD Generator"),
 ]
 
 

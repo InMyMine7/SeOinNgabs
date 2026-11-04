@@ -19,6 +19,7 @@ from ..generators.htaccess import generate_htaccess
 from ..generators.legal import generate_disclaimer, generate_privacy_policy, generate_terms
 from ..generators.metatags import generate_meta_tags
 from ..generators.robots import generate_robots_txt
+from ..generators.schema import generate_schema_interactive
 from ..generators.sitemap import generate_sitemap_interactive, validate_sitemap_interactive
 from ..research.keywords import research_keyword
 from ..research.trends import format_trends, get_trending_searches
@@ -75,6 +76,7 @@ ACTIONS = {
     "22": crawl_site_interactive,
     "23": generate_sitemap_interactive,
     "24": validate_sitemap_interactive,
+    "25": generate_schema_interactive,
 }
 
 
@@ -89,7 +91,7 @@ def run_menu(once: bool = False) -> None:
         clear_screen()
         print(render_menu())
         try:
-            choice = input("Choose an option (1-24, 0/q untuk keluar): ").strip().lower()
+            choice = input("Choose an option (1-25, 0/q untuk keluar): ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print()
             return
