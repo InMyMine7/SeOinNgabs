@@ -29,6 +29,7 @@ MENU_ITEMS = [
     ("16", "Privacy Policy Generator Tool"),
     ("17", "Disclaimer Generator Tool"),
     ("18", "Open Graph / Twitter Card Checker"),
+    ("19", "Image Alt Checker"),
 ]
 
 

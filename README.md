@@ -23,6 +23,7 @@ CLI tool SEO berbasis Python 3. Semua request memakai timeout, User-Agent jelas,
     <li>Privacy Policy Generator Tool</li>
     <li>Disclaimer Generator Tool</li>
     <li>Open Graph / Twitter Card Checker</li>
+    <li>Image Alt Checker</li>
 </ul>
 
 ## Installation

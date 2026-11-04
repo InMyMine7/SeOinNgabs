@@ -1,5 +1,6 @@
 """Menu interaktif SeOinNgabs (fix P5: loop, bukan sekali jalan)."""
 
+from ..analyzer import alt
 from ..analyzer.backlinks_gen import generate_backlinks
 from ..analyzer.broken import check_broken_links
 from ..analyzer.density import check_keyword_density
@@ -64,6 +65,7 @@ ACTIONS = {
     "16": generate_privacy_policy,
     "17": generate_disclaimer,
     "18": check_og_twitter,
+    "19": alt.check_image_alts,
 }
 
 
@@ -78,7 +80,7 @@ def run_menu(once: bool = False) -> None:
         clear_screen()
         print(render_menu())
         try:
-            choice = input("Choose an option (1-18, 0/q untuk keluar): ").strip().lower()
+            choice = input("Choose an option (1-19, 0/q untuk keluar): ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print()
             return
